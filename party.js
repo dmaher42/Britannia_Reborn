@@ -14,17 +14,70 @@ export class Character {
     this.baseSpeed=240;
     this.poisoned=false; this.poisonTurns=0;
     this.x=0; this.y=0; this.step=0; this.lastAng=0;
-    this.equippedWeight=0;
+    // Equipment slots: torso, head, weapon, etc.
+    this.equipment = {
+      torso: null,
+      head: null,
+      weapon: null,
+      shield: null,
+      // Add more slots as needed
+    };
+    this.backpack = [];
   }
   computeMPMax(){
     if(this.cls===CharacterClass.Avatar) return this.INT*2;
     if(this.cls===CharacterClass.Bard || this.cls===CharacterClass.Ranger) return Math.floor(this.INT/2);
     return 0;
   }
-  canEquip(totalWeight){ return totalWeight <= this.STR; }
-  packLimit(){ return this.STR*2; }
+  equippedWeight() {
+    // Sum weights of equipped items
+    return Object.values(this.equipment).reduce((sum, item) => sum + (item?.weight || 0), 0);
+  }
+  backpackWeight() {
+    return this.backpack.reduce((sum, item) => sum + (item.weight || 0) * (item.qty || 1), 0);
+  }
+  canEquip(item) {
+    // Check if item can be equipped (weight, restrictions)
+    if (item.restricted && item.restricted.includes(this.cls)) return false;
+    const slot = item.equip;
+    if (!slot || !this.equipment.hasOwnProperty(slot)) return false;
+    const newWeight = this.equippedWeight() - (this.equipment[slot]?.weight || 0) + (item.weight || 0);
+    return newWeight <= this.STR;
+  }
+  equip(item) {
+    const slot = item.equip;
+    if (this.canEquip(item)) {
+      this.equipment[slot] = item;
+      return true;
+    }
+    return false;
+  }
+  unequip(slot) {
+    this.equipment[slot] = null;
+  }
+  packLimit() { return this.STR * 2; }
+  canCarry(item) {
+    // Check if item can be added to backpack
+    const newWeight = this.backpackWeight() + (item.weight || 0) * (item.qty || 1);
+    return newWeight <= this.packLimit();
+  }
+  addToBackpack(item) {
+    if (this.canCarry(item)) {
+      const ex = this.backpack.find(x => x.id === item.id);
+      if (ex) ex.qty = (ex.qty || 0) + (item.qty || 1);
+      else this.backpack.push({ ...item, qty: item.qty || 1 });
+      return true;
+    }
+    return false;
+  }
+  isOverweight() {
+    return this.equippedWeight() > this.STR || this.backpackWeight() > this.packLimit();
+  }
   applyPoison(turns){ this.poisoned=true; this.poisonTurns=Math.min(5, (this.poisonTurns||0)+turns); }
-  tick(dt){ if(this.poisoned && Math.random()<0.015){ this.hp = Math.max(0, this.hp-1); } }
+  tick(dt){
+    if(this.poisoned && Math.random()<0.015){ this.hp = Math.max(0, this.hp-1); }
+    // Optionally: penalize movement if overweight
+  }
   draw(ctx, view, palette={base:'#f0e0c8',hair:'#d9b36c',armor:'#2c3f57',trim:'#9ec3ff',cloak:'#17324f',blade:'#cfd8e6',boot:'#203041'}, hood=false){
     const {camX, camY}=view;
     const sx = this.x - camX, sy = this.y - camY;
