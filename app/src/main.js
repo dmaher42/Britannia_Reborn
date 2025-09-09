@@ -3,7 +3,8 @@ import { Party, CharacterClass } from './party.js';
 import { Inventory } from './inventory.js';
 import { Spellbook, castFireDart } from './spells.js';
 import { CombatSystem } from './combat.js';
-import { talkToNPC, pushBubble, pushActions, showToast, updatePartyUI, updateInventoryUI, gridLayer } from './ui.js';
+import { talkToNPC } from './ai.js';
+import { pushBubble, pushActions, showToast, updatePartyUI, updateInventoryUI, gridLayer } from './ui.js';
 
 const dpr = Math.min(window.devicePixelRatio||1, 2);
 const skyC = document.getElementById('sky'), sky = skyC.getContext('2d');
