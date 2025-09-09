@@ -1,0 +1,12 @@
+name: Codex Reminder
+
+on:
+  issues:
+    types: [opened, labeled]
+
+jobs:
+  reminder:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Codex Task Reminder
+        run: echo "Review Codex tasks and prioritize."
