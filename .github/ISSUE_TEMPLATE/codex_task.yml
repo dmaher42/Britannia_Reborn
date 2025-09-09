@@ -1,0 +1,31 @@
+name: Codex Task
+description: Ask Codex to work on this repo
+title: "[codex] "
+labels: ["codex"]
+assignees: []
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: High-level goal
+      description: What outcome do you want Codex to deliver?
+      placeholder: e.g., Implement equipment slots and capacity rules with tests
+  - type: textarea
+    id: details
+    attributes:
+      label: Details / constraints
+      description: Link files, note constraints, and add acceptance criteria
+  - type: textarea
+    id: runbook
+    attributes:
+      label: Runbook for Codex
+      value: |
+        - Read AGENTS.md
+        - Implement changes
+        - Open a PR with a short demo GIF
+        - Ensure tests pass (if present)
+  - type: input
+    id: cc
+    attributes:
+      label: Mentions
+      value: "@codex"
