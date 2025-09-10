@@ -53,9 +53,17 @@ const combat = new CombatSystem(party, inventory, spells, gameC, ctx, fx, gridLa
 // Keyboard input: bind to window
 export const keys = Object.create(null);
 // Prevent default browser behavior (e.g., page scrolling) on key events
-window.addEventListener('keydown', e => { keys[e.key] = true; e.preventDefault(); });
-window.addEventListener('keyup',   e => { keys[e.key] = false; e.preventDefault(); });
-window.addEventListener('blur',    () => { for (const k in keys) keys[k] = false; });
+window.addEventListener('keydown', e => {
+  const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  keys[key] = true;
+  e.preventDefault();
+});
+window.addEventListener('keyup', e => {
+  const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  keys[key] = false;
+  e.preventDefault();
+});
+window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 
 // Focus logic
 const gameCanvas = document.getElementById('game');
@@ -165,10 +173,10 @@ function loop(){
   drawSky(sky, back, dt, innerWidth, innerHeight);
 
   let mvx=0,mvy=0;
-  if(keys['ArrowLeft']||keys['a']||keys['KeyA']) mvx-=1;
-  if(keys['ArrowRight']||keys['d']||keys['KeyD']) mvx+=1;
-  if(keys['ArrowUp']||keys['w']||keys['KeyW']) mvy-=1;
-  if(keys['ArrowDown']||keys['s']||keys['KeyS']) mvy+=1;
+  if(keys['ArrowLeft']||keys['a']) mvx-=1;
+  if(keys['ArrowRight']||keys['d']) mvx+=1;
+  if(keys['ArrowUp']||keys['w']) mvy-=1;
+  if(keys['ArrowDown']||keys['s']) mvy+=1;
   // Only move if not in enemy turn
   if((mvx||mvy) && (!combat.active || combat.turn !== 'enemy')){
     const len=Math.hypot(mvx,mvy)||1; mvx/=len; mvy/=len;
