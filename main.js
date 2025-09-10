@@ -113,7 +113,6 @@ function centerCameraOnLeader(){
   camY = party.leader.y - innerHeight/2;
   console.info('Boot: party size=', party.size, 'leader=', party.leader.name, 'coords=', Math.round(party.leader.x), Math.round(party.leader.y));
 }
-centerCameraOnLeader();
 onResize();
 
 // Ensure party members have sensible world coordinates (place near screen center)
@@ -178,17 +177,13 @@ function loop(){
     if(terr.key==='WATER'){ s*=0.5; }
     if(terr.key==='SAND'){ s*=0.92; }
     party.move(mvx*s*dt, mvy*s*dt);
+    camX += mvx * s * dt;
+    camY += mvy * s * dt;
     updateTerrainPill();
   }
   if(combat.active){
     combat.update(dt);
   }
-
-  // Always center camera on leader after movement
-  camX = party.leader.x - innerWidth/2;
-  camY = party.leader.y - innerHeight/2;
-  // Optionally, call centerCameraOnLeader() if needed
-
   const gameW = innerWidth, gameH = innerHeight;
   const view = {camX, camY, W:gameW, H:gameH};
   // Debug: draw a small red crosshair at screen center to ensure game canvas is visible
