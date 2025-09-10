@@ -40,3 +40,14 @@ describe('Equipment and pack weight limits', () => {
     expect(c.isOverweight()).toBe(true);
   });
 });
+
+describe('Movement speed when overweight', () => {
+  it('reduces speed when character is overweight', () => {
+    const c = new Character({ name: 'A', cls: CharacterClass.Fighter, STR: 5, DEX: 5, INT: 5 });
+    c.baseSpeed = 100;
+    expect(c.speed()).toBe(100);
+    c.equipment.torso = demoItem({ weight: 6 });
+    expect(c.isOverweight()).toBe(true);
+    expect(c.speed()).toBeCloseTo(60);
+  });
+});

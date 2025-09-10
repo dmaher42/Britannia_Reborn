@@ -73,6 +73,9 @@ export class Character {
   isOverweight() {
     return this.equippedWeight() > this.STR || this.backpackWeight() > this.packLimit();
   }
+  speed() {
+    return this.baseSpeed * (this.isOverweight() ? 0.6 : 1);
+  }
   applyPoison(turns){ this.poisoned=true; this.poisonTurns=Math.min(5, (this.poisonTurns||0)+turns); }
   tick(dt){
     if(this.poisoned && Math.random()<0.015){ this.hp = Math.max(0, this.hp-1); }

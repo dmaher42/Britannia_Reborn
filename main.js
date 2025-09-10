@@ -150,7 +150,7 @@ function loop(){
     if(mvx||mvy){
       const len=Math.hypot(mvx,mvy); mvx/=len; mvy/=len;
       const terr = TERRAIN.at(Math.floor(party.leader.x/TILE), Math.floor(party.leader.y/TILE));
-      let s = party.leader.baseSpeed;
+      let s = party.leader.speed();
       if(terr.key==='SWAMP'){ s*=0.7; if(Math.random()<0.02){ party.leader.applyPoison(1); } }
       if(terr.key==='FOREST'){ s*=0.86; }
       if(terr.key==='ROAD'){ s*=1.22; }
