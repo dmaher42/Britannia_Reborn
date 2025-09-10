@@ -50,8 +50,9 @@ const combat = new CombatSystem(party, inventory, spells, gameC, ctx, fx, gridLa
 
 // Keyboard input: bind to window
 export const keys = Object.create(null);
-window.addEventListener('keydown', e => { keys[e.key] = true; });
-window.addEventListener('keyup',   e => { keys[e.key] = false; });
+// Prevent default browser behavior (e.g., page scrolling) on key events
+window.addEventListener('keydown', e => { keys[e.key] = true; e.preventDefault(); });
+window.addEventListener('keyup',   e => { keys[e.key] = false; e.preventDefault(); });
 window.addEventListener('blur',    () => { for (const k in keys) keys[k] = false; });
 
 // Focus logic
