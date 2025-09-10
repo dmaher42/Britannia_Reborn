@@ -3,7 +3,8 @@ import { Party, CharacterClass } from './party.js';
 import { Inventory } from './inventory.js';
 import { Spellbook, castFireDart } from './spells.js';
 import { CombatSystem } from './combat.js';
-import { talkToNPC, pushBubble, pushActions, showToast, updatePartyUI, updateInventoryUI, gridLayer } from './ui.js';
+import { pushBubble, pushActions, showToast, updatePartyUI, updateInventoryUI, gridLayer } from './ui.js';
+import { talkToNPC } from './ai.js';
 
 const dpr = Math.min(window.devicePixelRatio||1, 2);
 const skyC = document.getElementById('sky'), sky = skyC.getContext('2d');
@@ -11,16 +12,31 @@ const backC = document.getElementById('back'), back = backC.getContext('2d');
 const gameC = document.getElementById('game'), ctx = gameC.getContext('2d',{alpha:false});
 const fxC = document.getElementById('fx'), fx = fxC.getContext('2d');
 function sizeCanvas(c){ c.width = innerWidth * dpr; c.height = innerHeight * dpr; c.style.width = innerWidth+'px'; c.style.height = innerHeight+'px'; c.getContext('2d').setTransform(dpr,0,0,dpr,0,0); }
-function onResize(){ [skyC,backC,gameC,fxC].forEach(sizeCanvas); }
+function onResize(){ [skyC,backC,gameC,fxC].forEach(sizeCanvas); centerCameraOnLeader(); }
 addEventListener('resize', onResize); onResize();
 
 let camX = -innerWidth/2, camY = -innerHeight/2;
+let heroMarkerVisible = true;
+let firstMoveMade = false;
+let _loggedBoot = false;
 
 const party = new Party([
   { name:'Avatar', cls:CharacterClass.Avatar, STR:12, DEX:10, INT:9, hpMax:30, mpClass:true },
   { name:'Iolo', cls:CharacterClass.Bard, STR:9, DEX:12, INT:8,  hpMax:22 },
   { name:'Shamino', cls:CharacterClass.Ranger, STR:11, DEX:12, INT:10, hpMax:24 }
 ]);
+
+// place party near screen center so leader is visible at boot
+function placePartyAtScreenCenter(){
+  const cx = innerWidth/2;
+  const cy = innerHeight/2;
+  const mid = (party.members.length - 1) / 2;
+  party.members.forEach((m,i)=>{
+    m.x = cx + (i - mid) * 28; // small side-by-side offsets
+    m.y = cy + (i % 2 ? 8 : -8);
+  });
+}
+placePartyAtScreenCenter();
 
 const inventory = new Inventory();
 inventory.gold = 125;
@@ -64,6 +80,44 @@ document.getElementById('btnAddLoot').onclick = ()=>{
 updatePartyUI(party);
 updateInventoryUI(inventory, party);
 
+// Center camera on leader at boot and ensure leader is within view
+function centerCameraOnLeader(){
+  if(!party.leader) return;
+  camX = party.leader.x - innerWidth/2;
+  camY = party.leader.y - innerHeight/2;
+  console.info('Boot: party size=', party.size, 'leader=', party.leader.name, 'coords=', Math.round(party.leader.x), Math.round(party.leader.y));
+}
+centerCameraOnLeader();
+
+// Ensure party members have sensible world coordinates (place near screen center)
+// Keep party positions as initialized by Party constructor; no forced repositioning here.
+
+// Hero Marker drawing helper
+function drawHeroMarker(ctx, view, leader){
+  if(!heroMarkerVisible || !leader) return;
+  const {camX, camY} = view;
+  const sx = leader.x - camX, sy = leader.y - camY;
+  ctx.save();
+  ctx.strokeStyle = '#8fd3ff'; ctx.lineWidth = 3; ctx.globalAlpha = 0.95;
+  ctx.beginPath(); ctx.ellipse(sx, sy+6, 22, 8, 0, 0, Math.PI*2); ctx.stroke();
+  ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(sx-28, sy-36, 56, 18);
+  ctx.fillStyle = '#bfeaff'; ctx.font = '12px sans-serif'; ctx.textAlign='center'; ctx.fillText(leader.name || 'Avatar', sx, sy-24);
+  ctx.restore();
+}
+
+// Dev toggle: press H to hide/show hero marker
+addEventListener('keydown', (e)=>{ if(e.key==='h' || e.key==='H'){ heroMarkerVisible = !heroMarkerVisible; console.info('Hero marker visible=', heroMarkerVisible); } });
+
+// First-move hint
+function showFirstMoveHint(){
+  const hint = document.createElement('div');
+  hint.id = 'firstMoveHint'; hint.style.position='fixed'; hint.style.left='12px'; hint.style.bottom='12px'; hint.style.padding='8px 12px';
+  hint.style.background='rgba(0,0,0,0.6)'; hint.style.color='#fff'; hint.style.borderRadius='6px'; hint.style.zIndex=9999;
+  hint.textContent = 'Use WASD/Arrows to move'; document.body.appendChild(hint);
+  setTimeout(()=>{ hint.style.transition='opacity 700ms'; hint.style.opacity='0'; setTimeout(()=>hint.remove(),800); },4000);
+}
+showFirstMoveHint();
+
 function updateTerrainPill() {
   const terr = TERRAIN.at(Math.floor(party.leader.x/TILE), Math.floor(party.leader.y/TILE));
   const pill = document.getElementById('terrainPill');
@@ -102,10 +156,25 @@ function loop(){
 
   const gameW = innerWidth, gameH = innerHeight;
   const view = {camX, camY, W:gameW, H:gameH};
+  // Debug: draw a small red crosshair at screen center to ensure game canvas is visible
+    // normal rendering
   const terrVisPenalty = TERRAIN.at(Math.floor(party.leader.x/TILE), Math.floor(party.leader.y/TILE)).key==='FOREST' ? .08 : 0;
   drawWorld(ctx, view, dt, terrVisPenalty);
+  // Draw world then party (ensure leader visible)
+  try{
+    if(!_loggedBoot){
+      console.info('Render loop starting. party.size=', party.size, 'leader=', party.leader && {x:Math.round(party.leader.x), y:Math.round(party.leader.y)} );
+      _loggedBoot = true;
+    }
   party.draw(ctx, view);
+  }catch(err){
+    console.error('party.draw failed', err && err.stack ? err.stack : err);
+  }
+  // Hero marker must be drawn after party so it sits on top
+  try{ drawHeroMarker(ctx, view, party.leader); } catch(e){ console.warn('Hero marker draw failed', e); }
   combat.draw(ctx, fx, view);
+
+  // no debug overlay in production
 
   combat.drawLighting(fx, view, party.leader);
   if(document.getElementById('bloom').checked) combat.compositeBloom(gameC, fxC, innerWidth, innerHeight);
