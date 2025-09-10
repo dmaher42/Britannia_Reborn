@@ -57,6 +57,37 @@ window.addEventListener('keydown', e => { keys[e.key] = true; e.preventDefault()
 window.addEventListener('keyup',   e => { keys[e.key] = false; e.preventDefault(); });
 window.addEventListener('blur',    () => { for (const k in keys) keys[k] = false; });
 
+// Overlay for pressed keys (toggle with '?')
+let showKeyOverlay = false;
+function updateKeyOverlay() {
+  let overlay = document.getElementById('keyOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'keyOverlay';
+    overlay.style.position = 'fixed';
+    overlay.style.top = '8px';
+    overlay.style.right = '8px';
+    overlay.style.background = 'rgba(0,0,0,0.7)';
+    overlay.style.color = '#fff';
+    overlay.style.font = '12px monospace';
+    overlay.style.padding = '4px 8px';
+    overlay.style.borderRadius = '6px';
+    overlay.style.zIndex = 9999;
+    document.body.appendChild(overlay);
+  }
+  overlay.style.display = showKeyOverlay ? 'block' : 'none';
+  if (showKeyOverlay) {
+    overlay.textContent = 'Keys: ' + Object.entries(keys).filter(([k,v])=>v).map(([k])=>k).join(', ');
+  }
+}
+window.addEventListener('keydown', e => {
+  if (e.key === '?') {
+    showKeyOverlay = !showKeyOverlay;
+    updateKeyOverlay();
+  }
+});
+setInterval(() => { if (showKeyOverlay) updateKeyOverlay(); }, 100);
+
 // Focus logic
 const gameCanvas = document.getElementById('game');
 const focusOverlay = document.getElementById('focusOverlay');
@@ -212,36 +243,7 @@ function loop(){
     _lastDebugLog = now;
   }
 
-// Overlay for pressed keys (toggle with '?')
-let showKeyOverlay = false;
-window.addEventListener('keydown', e => {
-  if (e.key === '?') {
-    showKeyOverlay = !showKeyOverlay;
-    updateKeyOverlay();
-  }
-});
-function updateKeyOverlay() {
-  let overlay = document.getElementById('keyOverlay');
-  if (!overlay) {
-    overlay = document.createElement('div');
-    overlay.id = 'keyOverlay';
-    overlay.style.position = 'fixed';
-    overlay.style.top = '8px';
-    overlay.style.right = '8px';
-    overlay.style.background = 'rgba(0,0,0,0.7)';
-    overlay.style.color = '#fff';
-    overlay.style.font = '12px monospace';
-    overlay.style.padding = '4px 8px';
-    overlay.style.borderRadius = '6px';
-    overlay.style.zIndex = 9999;
-    document.body.appendChild(overlay);
-  }
-  overlay.style.display = showKeyOverlay ? 'block' : 'none';
-  if (showKeyOverlay) {
-    overlay.textContent = 'Keys: ' + Object.entries(keys).filter(([k,v])=>v).map(([k])=>k).join(', ');
-  }
-}
-setInterval(() => { if (showKeyOverlay) updateKeyOverlay(); }, 100);
+  if (showKeyOverlay) updateKeyOverlay();
 
   // no debug overlay in production
 
