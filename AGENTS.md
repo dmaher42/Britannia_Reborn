@@ -29,3 +29,20 @@ Use `vitest`:
 
 ## CI expectations
 - For every PR: run tests and linters (if configured). Attach a short demo GIF for visual changes.
+
+## Recent changes (automated log)
+- Implemented equipment slots and overweight UI indicators; per-character equipped/backpack weight checks added.
+- Added Vitest unit tests for:
+	- MP per class
+	- Equip/pack limits
+	- Reagent casting rules
+	(see `tests/character.test.js` and `tests/spellbook.test.js`).
+- Added GitHub Actions workflow to run tests: `.github/workflows/ci.yml` (PR created: #18).
+- Feature branch with equipment & UI changes: PR #10 (feature/equipment-slots-overweight-ui).
+- Created follow-up issues for roadmap tasks: #13 (spells JSON + spells), #14 (terrain modifiers/tests), #15 (combat depth), #16 (CI + GIF requirement), #17 (demo GIF attach to PR #10).
+
+## How to run tests locally
+- Install deps: `npm ci`
+- Run tests: `npx vitest run`
+
+If you want a PR checklist or require CI to block merge until a demo GIF is attached, I can add a PR template or a lightweight GitHub Action that checks PR attachments.
