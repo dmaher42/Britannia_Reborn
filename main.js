@@ -50,8 +50,12 @@ const combat = new CombatSystem(party, inventory, spells, gameC, ctx, fx, gridLa
 
 const keys = {};
 function normalizeKey(k){ return k.length === 1 ? k.toLowerCase() : k; }
-addEventListener('keydown', e=>{ keys[normalizeKey(e.key)] = true; });
-addEventListener('keyup', e=>{ keys[normalizeKey(e.key)] = false; });
+function setKey(e, val){
+  keys[normalizeKey(e.key)] = val;
+  if(e.code) keys[e.code] = val;
+}
+addEventListener('keydown', e=>{ setKey(e, true); });
+addEventListener('keyup', e=>{ setKey(e, false); });
 
 document.getElementById('btnTalk').onclick = async () => {
   const npc = { name:'Britain Guard', profession:'Guard', town:'Britain', personality:'formal, dutiful' };
@@ -139,10 +143,10 @@ function loop(){
 
   if(!combat.active){
     let mvx=0,mvy=0;
-    if(keys['ArrowLeft']||keys['a']) mvx-=1;
-    if(keys['ArrowRight']||keys['d']) mvx+=1;
-    if(keys['ArrowUp']||keys['w']) mvy-=1;
-    if(keys['ArrowDown']||keys['s']) mvy+=1;
+    if(keys['ArrowLeft']||keys['a']||keys['KeyA']) mvx-=1;
+    if(keys['ArrowRight']||keys['d']||keys['KeyD']) mvx+=1;
+    if(keys['ArrowUp']||keys['w']||keys['KeyW']) mvy-=1;
+    if(keys['ArrowDown']||keys['s']||keys['KeyS']) mvy+=1;
     if(mvx||mvy){
       const len=Math.hypot(mvx,mvy); mvx/=len; mvy/=len;
       const terr = TERRAIN.at(Math.floor(party.leader.x/TILE), Math.floor(party.leader.y/TILE));
