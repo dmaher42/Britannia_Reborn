@@ -128,6 +128,11 @@ function updateTerrainPill() {
 let last = performance.now();
 function loop(){
   const now = performance.now(), dt = (now-last)/1000; last = now;
+  // Clear canvases that accumulate drawing each frame.
+  // Without clearing, the fx layer's bloom/lights compound and the screen
+  // quickly washes out or turns black when bloom is toggled.
+  ctx.clearRect(0,0,innerWidth,innerHeight);
+  fx.clearRect(0,0,innerWidth,innerHeight);
   back.clearRect(0,0,innerWidth,innerHeight); sky.clearRect(0,0,innerWidth,innerHeight);
   drawSky(sky, back, dt, innerWidth, innerHeight);
 
