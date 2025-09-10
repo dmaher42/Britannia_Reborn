@@ -19,6 +19,8 @@ let camX = -innerWidth/2, camY = -innerHeight/2;
 let heroMarkerVisible = true;
 let firstMoveMade = false;
 let _loggedBoot = false;
+const DEBUG = false;
+let _lastDebugLog = 0;
 
 const party = new Party([
   { name:'Avatar', cls:CharacterClass.Avatar, STR:12, DEX:10, INT:9, hpMax:30, mpClass:true },
@@ -203,9 +205,11 @@ function loop(){
     console.error('party.draw failed', err && err.stack ? err.stack : err);
   }
   combat.draw(ctx, fx, view);
-// Dev diagnostics
-console.info('Key listeners attached:', window);
-console.info('Party size:', party.size, 'Leader coords:', party.leader.x, party.leader.y);
+  if (DEBUG && now - _lastDebugLog > 1000) {
+    console.info('Key listeners attached:', window);
+    console.info('Party size:', party.size, 'Leader coords:', party.leader.x, party.leader.y);
+    _lastDebugLog = now;
+  }
 
 // Overlay for pressed keys (toggle with '?')
 let showKeyOverlay = false;
