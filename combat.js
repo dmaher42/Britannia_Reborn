@@ -29,6 +29,7 @@ export class CombatSystem {
         const dist = Math.hypot(dx,dy);
         if(dist>72){ const ang=Math.atan2(dy,dx); e.x += Math.cos(ang)*100*dt; e.y += Math.sin(ang)*100*dt; e.step += 100*dt*0.5; }
       }
+      // Re-enable movement after enemy turn
       this.turn='player';
     }
     if(this.flash>0) this.flash *= 0.9;

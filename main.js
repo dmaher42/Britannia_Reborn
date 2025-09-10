@@ -48,14 +48,35 @@ const spells = new Spellbook(inventory, party);
 
 const combat = new CombatSystem(party, inventory, spells, gameC, ctx, fx, gridLayer);
 
-const keys = {};
-function normalizeKey(k){ return k.length === 1 ? k.toLowerCase() : k; }
-function setKey(e, val){
-  keys[normalizeKey(e.key)] = val;
-  if(e.code) keys[e.code] = val;
+// Keyboard input: bind to window
+export const keys = Object.create(null);
+window.addEventListener('keydown', e => { keys[e.key] = true; });
+window.addEventListener('keyup',   e => { keys[e.key] = false; });
+window.addEventListener('blur',    () => { for (const k in keys) keys[k] = false; });
+
+// Focus logic
+const gameCanvas = document.getElementById('game');
+const focusOverlay = document.getElementById('focusOverlay');
+function showFocusOverlay() {
+  focusOverlay.style.display = 'block';
+  focusOverlay.textContent = 'Click to focus · Use WASD/Arrows to move';
 }
-addEventListener('keydown', e=>{ setKey(e, true); });
-addEventListener('keyup', e=>{ setKey(e, false); });
+function hideFocusOverlay() {
+  focusOverlay.style.display = 'none';
+}
+function checkFocus() {
+  if (!document.hasFocus() || document.activeElement !== gameCanvas) {
+    showFocusOverlay();
+  } else {
+    hideFocusOverlay();
+  }
+}
+gameCanvas.addEventListener('mousedown', () => { gameCanvas.focus(); });
+gameCanvas.addEventListener('touchstart', () => { gameCanvas.focus(); });
+window.addEventListener('focus', checkFocus);
+window.addEventListener('blur', checkFocus);
+document.addEventListener('DOMContentLoaded', checkFocus);
+setTimeout(checkFocus, 500);
 
 document.getElementById('btnTalk').onclick = async () => {
   const npc = { name:'Britain Guard', profession:'Guard', town:'Britain', personality:'formal, dutiful' };
@@ -146,8 +167,9 @@ function loop(){
   if(keys['ArrowRight']||keys['d']||keys['KeyD']) mvx+=1;
   if(keys['ArrowUp']||keys['w']||keys['KeyW']) mvy-=1;
   if(keys['ArrowDown']||keys['s']||keys['KeyS']) mvy+=1;
-  if(mvx||mvy){
-    const len=Math.hypot(mvx,mvy); mvx/=len; mvy/=len;
+  // Only move if not in enemy turn
+  if((mvx||mvy) && (!combat.active || combat.turn !== 'enemy')){
+    const len=Math.hypot(mvx,mvy)||1; mvx/=len; mvy/=len;
     const terr = TERRAIN.at(Math.floor(party.leader.x/TILE), Math.floor(party.leader.y/TILE));
     let s = party.leader.speed();
     if(terr.key==='SWAMP'){ s*=0.7; if(Math.random()<0.02){ party.leader.applyPoison(1); } }
@@ -162,7 +184,10 @@ function loop(){
     combat.update(dt);
   }
 
-  camX = party.leader.x - innerWidth/2; camY = party.leader.y - innerHeight/2;
+  // Always center camera on leader after movement
+  camX = party.leader.x - innerWidth/2;
+  camY = party.leader.y - innerHeight/2;
+  // Optionally, call centerCameraOnLeader() if needed
 
   const gameW = innerWidth, gameH = innerHeight;
   const view = {camX, camY, W:gameW, H:gameH};
@@ -177,12 +202,46 @@ function loop(){
       _loggedBoot = true;
     }
   party.draw(ctx, view);
+  // Draw Hero Marker and nameplate after party
+  drawHeroMarker(ctx, view, party.leader);
   }catch(err){
     console.error('party.draw failed', err && err.stack ? err.stack : err);
   }
-  // Hero marker must be drawn after party so it sits on top
-  try{ drawHeroMarker(ctx, view, party.leader); } catch(e){ console.warn('Hero marker draw failed', e); }
   combat.draw(ctx, fx, view);
+// Dev diagnostics
+console.info('Key listeners attached:', window);
+console.info('Party size:', party.size, 'Leader coords:', party.leader.x, party.leader.y);
+
+// Overlay for pressed keys (toggle with '?')
+let showKeyOverlay = false;
+window.addEventListener('keydown', e => {
+  if (e.key === '?') {
+    showKeyOverlay = !showKeyOverlay;
+    updateKeyOverlay();
+  }
+});
+function updateKeyOverlay() {
+  let overlay = document.getElementById('keyOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'keyOverlay';
+    overlay.style.position = 'fixed';
+    overlay.style.top = '8px';
+    overlay.style.right = '8px';
+    overlay.style.background = 'rgba(0,0,0,0.7)';
+    overlay.style.color = '#fff';
+    overlay.style.font = '12px monospace';
+    overlay.style.padding = '4px 8px';
+    overlay.style.borderRadius = '6px';
+    overlay.style.zIndex = 9999;
+    document.body.appendChild(overlay);
+  }
+  overlay.style.display = showKeyOverlay ? 'block' : 'none';
+  if (showKeyOverlay) {
+    overlay.textContent = 'Keys: ' + Object.entries(keys).filter(([k,v])=>v).map(([k])=>k).join(', ');
+  }
+}
+setInterval(() => { if (showKeyOverlay) updateKeyOverlay(); }, 100);
 
   // no debug overlay in production
 

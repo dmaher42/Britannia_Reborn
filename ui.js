@@ -1,3 +1,29 @@
+// Overlay helpers
+export function showOverlay(id, text) {
+  let el = document.getElementById(id);
+  if (!el) {
+    el = document.createElement('div');
+    el.id = id;
+    el.style.position = 'fixed';
+    el.style.left = '0';
+    el.style.top = '0';
+    el.style.width = '100vw';
+    el.style.height = '100vh';
+    el.style.zIndex = '1000';
+    el.style.pointerEvents = 'none';
+    el.style.textAlign = 'center';
+    el.style.font = '16px sans-serif';
+    el.style.color = '#fff';
+    el.style.background = 'rgba(0,0,0,0.25)';
+    document.body.appendChild(el);
+  }
+  el.textContent = text;
+  el.style.display = 'block';
+}
+export function hideOverlay(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = 'none';
+}
 export const dialogueEl = document.getElementById('dialogue');
 export const toast = document.getElementById('toast');
 export const gridLayer = document.getElementById('gridOverlay');

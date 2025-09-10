@@ -10,8 +10,9 @@
   <div id="root">
     <canvas id="sky"></canvas>
     <canvas id="back"></canvas>
-    <canvas id="game"></canvas>
-    <canvas id="fx"></canvas>
+  <canvas id="game" tabindex="0"></canvas>
+  <canvas id="fx"></canvas>
+  <div id="focusOverlay" style="display:none;position:absolute;left:0;top:0;width:100vw;height:100vh;z-index:1000;pointer-events:none;text-align:center;font:16px sans-serif;color:#fff;background:rgba(0,0,0,0.25)"></div>
     <svg class="gridOverlay" id="gridOverlay"></svg>
     <div class="vignette"></div>
 

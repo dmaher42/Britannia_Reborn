@@ -3,8 +3,13 @@
 A modern, browser‑based reimagining of classic Britannia with an AI‑driven narrative.
 
 ## Quick Start
-- Open `app/index.html` directly in your browser for the full ES‑modules demo (no server required).
-- Or open `demo.html` and click “Launch the Game”.
+- Open `index.html` directly in your browser (or the GitHub Pages URL).
+- Click the game once to focus (if needed), then use WASD/Arrow keys to move immediately.
+## Troubleshooting
+If movement does not work (blank or stuck):
+- Ensure the game canvas is focused (click once if needed).
+- Check for blocked key listeners (should be attached to window).
+- Exiting combat/skirmish should re-enable movement.
 
 ## Using Codex
 - Connect your GitHub to Codex in ChatGPT.
