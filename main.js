@@ -48,9 +48,10 @@ const spells = new Spellbook(inventory, party);
 
 const combat = new CombatSystem(party, inventory, spells, gameC, ctx, fx, gridLayer);
 
-const keys={};
-addEventListener('keydown', e=>keys[e.key]=true);
-addEventListener('keyup', e=>keys[e.key]=false);
+const keys = {};
+function normalizeKey(k){ return k.length === 1 ? k.toLowerCase() : k; }
+addEventListener('keydown', e=>{ keys[normalizeKey(e.key)] = true; });
+addEventListener('keyup', e=>{ keys[normalizeKey(e.key)] = false; });
 
 document.getElementById('btnTalk').onclick = async () => {
   const npc = { name:'Britain Guard', profession:'Guard', town:'Britain', personality:'formal, dutiful' };
