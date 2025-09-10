@@ -41,8 +41,8 @@ export function updateInventoryUI(inv, party){
     let equipStatus = '';
     let packStatus = '';
     if (party && party.members) {
-      equipStatus = party.members.map(m => `${m.name}: ${m.equippedWeight ? m.equippedWeight() : 0}/${m.STR}${m.isOverweight && m.isOverweight() && m.equippedWeight && m.equippedWeight() > m.STR ? ' <span style=\"color:#ff6b6b\">[Over]</span>' : ''}`).join(', ');
-      packStatus = party.members.map(m => `${m.name}: ${m.backpackWeight ? m.backpackWeight() : 0}/${m.packLimit ? m.packLimit() : 0}${m.isOverweight && m.isOverweight() && m.backpackWeight && m.backpackWeight() > m.packLimit() ? ' <span style=\"color:#ff6b6b\">[Over]</span>' : ''}`).join(', ');
+      equipStatus = party.members.map(m => `${m.name}: ${m.equippedWeight ? m.equippedWeight() : 0}/${m.STR}${m.isOverweight && m.isOverweight() && m.equippedWeight && m.equippedWeight() > m.STR ? ' <span style="color:#ff6b6b">[Over]</span>' : ''}`).join(', ');
+      packStatus = party.members.map(m => `${m.name}: ${m.backpackWeight ? m.backpackWeight() : 0}/${m.packLimit ? m.packLimit() : 0}${m.isOverweight && m.isOverweight() && m.backpackWeight && m.backpackWeight() > m.packLimit() ? ' <span style="color:#ff6b6b">[Over]</span>' : ''}`).join(', ');
     }
     document.getElementById('equipRule').innerHTML = equipStatus || 'equip ≤ STR';
     document.getElementById('packRule').innerHTML = packStatus || 'pack ≤ STR×2';
