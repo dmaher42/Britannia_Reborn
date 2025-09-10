@@ -141,25 +141,24 @@ function loop(){
   back.clearRect(0,0,innerWidth,innerHeight); sky.clearRect(0,0,innerWidth,innerHeight);
   drawSky(sky, back, dt, innerWidth, innerHeight);
 
-  if(!combat.active){
-    let mvx=0,mvy=0;
-    if(keys['ArrowLeft']||keys['a']||keys['KeyA']) mvx-=1;
-    if(keys['ArrowRight']||keys['d']||keys['KeyD']) mvx+=1;
-    if(keys['ArrowUp']||keys['w']||keys['KeyW']) mvy-=1;
-    if(keys['ArrowDown']||keys['s']||keys['KeyS']) mvy+=1;
-    if(mvx||mvy){
-      const len=Math.hypot(mvx,mvy); mvx/=len; mvy/=len;
-      const terr = TERRAIN.at(Math.floor(party.leader.x/TILE), Math.floor(party.leader.y/TILE));
-      let s = party.leader.speed();
-      if(terr.key==='SWAMP'){ s*=0.7; if(Math.random()<0.02){ party.leader.applyPoison(1); } }
-      if(terr.key==='FOREST'){ s*=0.86; }
-      if(terr.key==='ROAD'){ s*=1.22; }
-      if(terr.key==='WATER'){ s*=0.5; }
-      if(terr.key==='SAND'){ s*=0.92; }
-      party.move(mvx*s*dt, mvy*s*dt);
-      updateTerrainPill();
-    }
-  } else {
+  let mvx=0,mvy=0;
+  if(keys['ArrowLeft']||keys['a']||keys['KeyA']) mvx-=1;
+  if(keys['ArrowRight']||keys['d']||keys['KeyD']) mvx+=1;
+  if(keys['ArrowUp']||keys['w']||keys['KeyW']) mvy-=1;
+  if(keys['ArrowDown']||keys['s']||keys['KeyS']) mvy+=1;
+  if(mvx||mvy){
+    const len=Math.hypot(mvx,mvy); mvx/=len; mvy/=len;
+    const terr = TERRAIN.at(Math.floor(party.leader.x/TILE), Math.floor(party.leader.y/TILE));
+    let s = party.leader.speed();
+    if(terr.key==='SWAMP'){ s*=0.7; if(Math.random()<0.02){ party.leader.applyPoison(1); } }
+    if(terr.key==='FOREST'){ s*=0.86; }
+    if(terr.key==='ROAD'){ s*=1.22; }
+    if(terr.key==='WATER'){ s*=0.5; }
+    if(terr.key==='SAND'){ s*=0.92; }
+    party.move(mvx*s*dt, mvy*s*dt);
+    updateTerrainPill();
+  }
+  if(combat.active){
     combat.update(dt);
   }
 
