@@ -13,7 +13,7 @@ const gameC = document.getElementById('game'), ctx = gameC.getContext('2d',{alph
 const fxC = document.getElementById('fx'), fx = fxC.getContext('2d');
 function sizeCanvas(c){ c.width = innerWidth * dpr; c.height = innerHeight * dpr; c.style.width = innerWidth+'px'; c.style.height = innerHeight+'px'; c.getContext('2d').setTransform(dpr,0,0,dpr,0,0); }
 function onResize(){ [skyC,backC,gameC,fxC].forEach(sizeCanvas); centerCameraOnLeader(); }
-addEventListener('resize', onResize); onResize();
+addEventListener('resize', onResize);
 
 let camX = -innerWidth/2, camY = -innerHeight/2;
 let heroMarkerVisible = true;
@@ -88,6 +88,7 @@ function centerCameraOnLeader(){
   console.info('Boot: party size=', party.size, 'leader=', party.leader.name, 'coords=', Math.round(party.leader.x), Math.round(party.leader.y));
 }
 centerCameraOnLeader();
+onResize();
 
 // Ensure party members have sensible world coordinates (place near screen center)
 // Keep party positions as initialized by Party constructor; no forced repositioning here.
