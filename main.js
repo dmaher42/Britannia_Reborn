@@ -68,15 +68,20 @@ function normalizeKey(k) {
 }
 
 // Prevent default browser behavior (e.g., page scrolling) on key events
+function isRefreshCombo(e) {
+  return e.key.startsWith('F') ||
+    (e.key.toLowerCase() === 'r' && (e.ctrlKey || e.metaKey));
+}
+
 window.addEventListener('keydown', e => {
   const key = normalizeKey(e.key);
   keys[key] = true;
-  e.preventDefault();
+  if (!isRefreshCombo(e)) e.preventDefault();
 });
 window.addEventListener('keyup', e => {
   const key = normalizeKey(e.key);
   keys[key] = false;
-  e.preventDefault();
+  if (!isRefreshCombo(e)) e.preventDefault();
 });
 window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 
