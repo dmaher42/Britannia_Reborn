@@ -16,7 +16,7 @@ function sizeCanvas(c){ c.width = innerWidth * dpr; c.height = innerHeight * dpr
 function onResize(){ [skyC,backC,gameC,fxC].forEach(sizeCanvas); }
 addEventListener('resize', onResize);
 
-let camX = -innerWidth/2, camY = -innerHeight/2;
+let camX = 0, camY = 0;  // Start with neutral position, will be set after party placement
 let heroMarkerVisible = true;
 let firstMoveMade = false;
 let _loggedBoot = false;
@@ -40,6 +40,10 @@ function placePartyAtScreenCenter(){
   });
 }
 placePartyAtScreenCenter();
+
+// Immediately set camera to follow the leader after party placement
+camX = party.leader.x - (window.innerWidth || 1280) / 2;
+camY = party.leader.y - (window.innerHeight || 720) / 2;
 
 const inventory = new Inventory();
 inventory.gold = 125;
@@ -177,11 +181,18 @@ updateInventoryUI(inventory, party);
 // Center camera on leader at boot and ensure leader is within view
 function centerCameraOnLeader(){
   if(!party.leader) return;
-  camX = party.leader.x - innerWidth/2;
-  camY = party.leader.y - innerHeight/2;
+  // Use window dimensions to ensure proper calculation
+  const w = window.innerWidth || 1280;
+  const h = window.innerHeight || 720;
+  camX = party.leader.x - w/2;
+  camY = party.leader.y - h/2;
   console.info('Boot: party size=', party.size, 'leader=', party.leader.name, 'coords=', Math.round(party.leader.x), Math.round(party.leader.y));
 }
 onResize();
+// Ensure camera is properly centered after everything is loaded
+window.addEventListener('load', () => {
+  centerCameraOnLeader();
+});
 centerCameraOnLeader();
 
 // Ensure party members have sensible world coordinates (place near screen center)
