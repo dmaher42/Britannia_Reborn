@@ -11,7 +11,8 @@ const ASSETS = [
   '/spells.js',
   '/combat.js',
   '/ui.js',
-  '/ai.js'
+  '/ai.js',
+  '/selection.js'
 ];
 
 self.addEventListener('install', event => {
