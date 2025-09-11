@@ -20,7 +20,31 @@ let camX = -innerWidth/2, camY = -innerHeight/2;
 let heroMarkerVisible = true;
 let firstMoveMade = false;
 let _loggedBoot = false;
-const DEBUG = false;
+
+// Comprehensive Debug System
+const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+const params = new URLSearchParams(location.search);
+const forceDebug = params.get('debug') === '1';
+
+window.__DBG = {
+  ENABLED: isLocalhost || forceDebug,
+  FORCE_MOVE: false,
+  FORCE_CAMERA: false,
+  TEST_SPEED: 120,
+  PRINT_FREQ: 30,
+  _frame: 0,
+  last: 0,
+  fps: 0,
+  frameTimes: [],
+  fpsSamples: [],
+  inputLog: [],
+  MAX_INPUT_LOG: 50,
+  AUTO_DISABLED: !isLocalhost && !forceDebug,
+  overlayVisible: false,
+  crosshairVisible: false
+};
+
+const DEBUG = false;  // Legacy debug flag, kept for compatibility
 let _lastDebugLog = 0;
 
 const party = new Party([
@@ -77,11 +101,37 @@ function isRefreshCombo(e) {
 window.addEventListener('keydown', e => {
   const key = normalizeKey(e.key);
   keys[key] = true;
+  
+  // Debug: Log input events
+  if (window.__DBG && window.__DBG.ENABLED) {
+    window.__DBG.inputLog.unshift({
+      t: performance.now(),
+      type: 'down',
+      key: e.key
+    });
+    if (window.__DBG.inputLog.length > window.__DBG.MAX_INPUT_LOG) {
+      window.__DBG.inputLog.pop();
+    }
+  }
+  
   if (!isRefreshCombo(e)) e.preventDefault();
 });
 window.addEventListener('keyup', e => {
   const key = normalizeKey(e.key);
   keys[key] = false;
+  
+  // Debug: Log input events  
+  if (window.__DBG && window.__DBG.ENABLED) {
+    window.__DBG.inputLog.unshift({
+      t: performance.now(),
+      type: 'up', 
+      key: e.key
+    });
+    if (window.__DBG.inputLog.length > window.__DBG.MAX_INPUT_LOG) {
+      window.__DBG.inputLog.pop();
+    }
+  }
+  
   if (!isRefreshCombo(e)) e.preventDefault();
 });
 window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
@@ -114,8 +164,155 @@ window.addEventListener('keydown', e => {
     showKeyOverlay = !showKeyOverlay;
     updateKeyOverlay();
   }
+  
+  // Debug: Backtick toggle for debug overlay
+  if (e.key === '`') {
+    if (window.__DBG) {
+      window.__DBG.overlayVisible = !window.__DBG.overlayVisible;
+      window.__DBG.crosshairVisible = window.__DBG.overlayVisible;
+      updateDebugOverlay();
+      console.info('Debug overlay:', window.__DBG.overlayVisible ? 'enabled' : 'disabled');
+    }
+  }
 });
 setInterval(() => { if (showKeyOverlay) updateKeyOverlay(); }, 100);
+
+// Debug Helper Functions
+window.enableDebug = function() {
+  if (!window.__DBG) return;
+  window.__DBG.ENABLED = true;
+  window.__DBG.overlayVisible = true;
+  window.__DBG.crosshairVisible = true;
+  updateDebugOverlay();
+  console.info('Debug enabled');
+};
+
+window.disableDebug = function() {
+  if (!window.__DBG) return;
+  window.__DBG.ENABLED = false;
+  window.__DBG.overlayVisible = false; 
+  window.__DBG.crosshairVisible = false;
+  window.__DBG.FORCE_MOVE = false;
+  window.__DBG.FORCE_CAMERA = false;
+  updateDebugOverlay();
+  console.info('Debug disabled');
+};
+
+window.forceMove = function(enabled) {
+  if (!window.__DBG) return;
+  window.__DBG.FORCE_MOVE = !!enabled;
+  console.info('Force move:', enabled ? 'enabled' : 'disabled');
+};
+
+window.forceCamera = function(enabled) {
+  if (!window.__DBG) return;
+  window.__DBG.FORCE_CAMERA = !!enabled;
+  console.info('Force camera:', enabled ? 'enabled' : 'disabled');
+};
+
+// Debug Overlay System
+function updateDebugOverlay() {
+  if (!window.__DBG) return;
+  
+  let overlay = document.getElementById('debugOverlay');
+  
+  if (!window.__DBG.overlayVisible) {
+    if (overlay) overlay.style.display = 'none';
+    return;
+  }
+  
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'debugOverlay';
+    overlay.style.position = 'fixed';
+    overlay.style.top = '8px';
+    overlay.style.left = '8px';
+    overlay.style.background = 'rgba(0,0,0,0.8)';
+    overlay.style.color = '#0f0';
+    overlay.style.font = '11px monospace';
+    overlay.style.padding = '8px';
+    overlay.style.borderRadius = '4px';
+    overlay.style.zIndex = 9998;
+    overlay.style.maxWidth = '300px';
+    overlay.style.lineHeight = '1.2';
+    document.body.appendChild(overlay);
+  }
+  
+  overlay.style.display = 'block';
+  
+  // Calculate current terrain and speed info
+  const leader = party?.leader;
+  let terrainInfo = 'N/A';
+  let speedInfo = 'N/A';
+  let overweightInfo = '';
+  
+  if (leader) {
+    const terr = TERRAIN.at(Math.floor(leader.x/TILE), Math.floor(leader.y/TILE));
+    terrainInfo = `${terr.name} (${terr.key})`;
+    
+    let baseSpeed = leader.speed();
+    let modifier = 1.0;
+    
+    if (terr.key === 'SWAMP') modifier = 0.7;
+    else if (terr.key === 'FOREST') modifier = 0.86;
+    else if (terr.key === 'ROAD') modifier = 1.22;
+    else if (terr.key === 'WATER') modifier = 0.5;
+    else if (terr.key === 'SAND') modifier = 0.92;
+    
+    const finalSpeed = baseSpeed * modifier;
+    speedInfo = `${baseSpeed.toFixed(1)} × ${modifier} = ${finalSpeed.toFixed(1)}`;
+    
+    // Check overweight status
+    const equippedWeight = leader.equippedWeight || 0;
+    const packWeight = leader.packWeight || 0;
+    const strLimit = leader.STR * 2;
+    
+    if (equippedWeight > leader.STR) {
+      overweightInfo += ' [EQUIP OVERWEIGHT]';
+    }
+    if (packWeight > strLimit) {
+      overweightInfo += ' [PACK OVERWEIGHT]';
+    }
+  }
+  
+  // Input log (last 5 events)
+  const recentInputs = window.__DBG.inputLog.slice(0, 5).map(input => {
+    const time = (input.t / 1000).toFixed(1);
+    return `${time}s: ${input.type} ${input.key}`;
+  }).join('\n');
+  
+  overlay.innerHTML = `
+<b>DEBUG OVERLAY</b> (toggle: \`)
+<b>FPS:</b> ${window.__DBG.fps.toFixed(1)} (${(window.__DBG.last || 0).toFixed(1)}ms)
+<b>Frame:</b> ${window.__DBG._frame}
+<b>Terrain:</b> ${terrainInfo}
+<b>Speed:</b> ${speedInfo}${overweightInfo}
+<b>Camera:</b> ${camX.toFixed(0)}, ${camY.toFixed(0)}
+${leader ? `<b>Leader:</b> ${leader.x.toFixed(0)}, ${leader.y.toFixed(0)}` : ''}
+<b>Input Log:</b>
+${recentInputs || 'No recent input'}
+<small>Force: move=${window.__DBG.FORCE_MOVE} cam=${window.__DBG.FORCE_CAMERA}</small>
+  `.trim();
+}
+
+function updateFpsTracking(frameTime) {
+  if (!window.__DBG) return;
+  
+  window.__DBG._frame++;
+  window.__DBG.last = frameTime;
+  
+  // Keep last 60 frame times for averaging
+  window.__DBG.frameTimes.push(frameTime);
+  if (window.__DBG.frameTimes.length > 60) {
+    window.__DBG.frameTimes.shift();
+  }
+  
+  // Calculate FPS every 10 frames
+  if (window.__DBG._frame % 10 === 0) {
+    const avgFrameTime = window.__DBG.frameTimes.reduce((a,b) => a+b, 0) / window.__DBG.frameTimes.length;
+    window.__DBG.fps = avgFrameTime > 0 ? 1000 / avgFrameTime : 0;
+  }
+}
 
 // Focus logic
 const gameCanvas = document.getElementById('game');
@@ -223,7 +420,15 @@ let last = performance.now();
 function loop(){
   requestAnimationFrame(loop);
   try {
-    const now = performance.now(), dt = (now-last)/1000; last = now;
+    const now = performance.now(), dt = (now-last)/1000; 
+    const frameTime = now - last;
+    last = now;
+    
+    // Debug: FPS tracking
+    if (window.__DBG && window.__DBG.ENABLED) {
+      updateFpsTracking(frameTime);
+    }
+    
     // Clear canvases that accumulate drawing each frame.
     // Without clearing, the fx layer's bloom/lights compound and the screen
     // quickly washes out or turns black when bloom is toggled.
@@ -232,7 +437,18 @@ function loop(){
     back.clearRect(0,0,innerWidth,innerHeight); sky.clearRect(0,0,innerWidth,innerHeight);
     drawSky(sky, back, dt, innerWidth, innerHeight);
 
+  // Debug: Forced movement and camera (before normal input processing)
   let mvx=0,mvy=0;
+  
+  if (window.__DBG && window.__DBG.FORCE_MOVE) {
+    mvx = 1; // Force rightward movement
+  }
+  
+  if (window.__DBG && window.__DBG.FORCE_CAMERA) {
+    camX += window.__DBG.TEST_SPEED * dt;
+  }
+  
+  // Normal input processing
   if(keys['ArrowLeft']||keys['a']) mvx-=1;
   if(keys['ArrowRight']||keys['d']) mvx+=1;
   if(keys['ArrowUp']||keys['w']) mvy-=1;
@@ -257,10 +473,30 @@ function loop(){
   }
   const gameW = innerWidth, gameH = innerHeight;
   const view = {camX, camY, W:gameW, H:gameH};
-  // Debug: draw a small red crosshair at screen center to ensure game canvas is visible
-    // normal rendering
+  
+  // Debug: draw crosshair at screen center
+  if (window.__DBG && window.__DBG.crosshairVisible) {
+    ctx.save();
+    ctx.strokeStyle = '#ff4040';
+    ctx.globalAlpha = 0.7;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(innerWidth/2 - 10, innerHeight/2);
+    ctx.lineTo(innerWidth/2 + 10, innerHeight/2);
+    ctx.moveTo(innerWidth/2, innerHeight/2 - 10);
+    ctx.lineTo(innerWidth/2, innerHeight/2 + 10);
+    ctx.stroke();
+    ctx.restore();
+  }
+  
+  // Normal rendering
   const terrVisPenalty = TERRAIN.at(Math.floor(party.leader.x/TILE), Math.floor(party.leader.y/TILE)).key==='FOREST' ? .08 : 0;
   drawWorld(ctx, view, dt, terrVisPenalty);
+  
+  // Debug: Tile highlight overlay
+  if (window.__DBG && window.__DBG.overlayVisible) {
+    drawTileOverlay(ctx, view);
+  }
   // Draw world then party (ensure leader visible)
   try{
     if(!_loggedBoot){
@@ -274,6 +510,19 @@ function loop(){
     console.error('party.draw failed', err && err.stack ? err.stack : err);
   }
   combat.draw(ctx, fx, view);
+  
+  // Debug: Periodic snapshot logging
+  if (window.__DBG && window.__DBG.ENABLED && window.__DBG._frame % window.__DBG.PRINT_FREQ === 0) {
+    console.info('Debug Snapshot:', {
+      frame: window.__DBG._frame,
+      leader: party.leader ? {x: Math.round(party.leader.x), y: Math.round(party.leader.y)} : null,
+      camera: {camX: Math.round(camX), camY: Math.round(camY)},
+      combat: {active: combat.active, turn: combat.turn},
+      pressedKeys: Object.entries(keys).filter(([k,v])=>v).map(([k])=>k),
+      dt: dt.toFixed(3)
+    });
+  }
+  
   if (DEBUG && now - _lastDebugLog > 1000) {
     console.info('Key listeners attached:', window);
     console.info('Party size:', party.size, 'Leader coords:', party.leader.x, party.leader.y);
@@ -281,6 +530,11 @@ function loop(){
   }
 
   if (showKeyOverlay) updateKeyOverlay();
+  
+  // Debug: Update overlay every few frames
+  if (window.__DBG && window.__DBG.overlayVisible && window.__DBG._frame % 10 === 0) {
+    updateDebugOverlay();
+  }
 
   // no debug overlay in production
 
@@ -291,3 +545,53 @@ function loop(){
   }
 }
 requestAnimationFrame(loop);
+
+// Debug: Tile overlay function
+function drawTileOverlay(ctx, view) {
+  if (!window.__DBG || !window.__DBG.overlayVisible) return;
+  
+  const {camX, camY, W, H} = view;
+  const startTileX = Math.floor(camX / TILE);
+  const startTileY = Math.floor(camY / TILE);
+  const endTileX = Math.ceil((camX + W) / TILE);
+  const endTileY = Math.ceil((camY + H) / TILE);
+  
+  ctx.save();
+  ctx.strokeStyle = '#ffff00';
+  ctx.globalAlpha = 0.3;
+  ctx.lineWidth = 1;
+  
+  // Draw tile grid
+  for (let tx = startTileX; tx <= endTileX; tx++) {
+    for (let ty = startTileY; ty <= endTileY; ty++) {
+      const sx = tx * TILE - camX;
+      const sy = ty * TILE - camY;
+      
+      ctx.strokeRect(sx, sy, TILE, TILE);
+    }
+  }
+  
+  // Highlight leader's current tile
+  if (party?.leader) {
+    const leaderTileX = Math.floor(party.leader.x / TILE);
+    const leaderTileY = Math.floor(party.leader.y / TILE);
+    const sx = leaderTileX * TILE - camX;
+    const sy = leaderTileY * TILE - camY;
+    
+    ctx.fillStyle = 'rgba(255, 0, 0, 0.2)';
+    ctx.fillRect(sx, sy, TILE, TILE);
+  }
+  
+  ctx.restore();
+}
+
+// Debug: Export core references for debugging (guarded)
+if (window.__DBG && window.__DBG.ENABLED) {
+  window.__DBG_REFS = {
+    party,
+    combat, 
+    keys,
+    inventory,
+    spells
+  };
+}
