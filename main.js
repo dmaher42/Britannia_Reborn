@@ -22,6 +22,7 @@ let firstMoveMade = false;
 let _loggedBoot = false;
 const DEBUG = false;
 let _lastDebugLog = 0;
+const LOOK_SPEED = 240; // pixels per second for camera look
 
 const party = new Party([
   { name:'Avatar', cls:CharacterClass.Avatar, STR:12, DEX:10, INT:9, hpMax:30, mpClass:true },
@@ -148,7 +149,7 @@ const gameCanvas = document.getElementById('game');
 const focusOverlay = document.getElementById('focusOverlay');
 function showFocusOverlay() {
   focusOverlay.style.display = 'block';
-  focusOverlay.textContent = 'Click to refocus · Use WASD/Arrows to move';
+  focusOverlay.textContent = 'Click to refocus · WASD to move · Arrows to look';
 }
 function hideFocusOverlay() {
   focusOverlay.style.display = 'none';
@@ -241,7 +242,7 @@ function showFirstMoveHint(){
   const hint = document.createElement('div');
   hint.id = 'firstMoveHint'; hint.style.position='fixed'; hint.style.left='12px'; hint.style.bottom='12px'; hint.style.padding='8px 12px';
   hint.style.background='rgba(0,0,0,0.6)'; hint.style.color='#fff'; hint.style.borderRadius='6px'; hint.style.zIndex=9999;
-  hint.textContent = 'Use WASD/Arrows to move'; document.body.appendChild(hint);
+  hint.textContent = 'Move with WASD · Look with Arrows'; document.body.appendChild(hint);
   setTimeout(()=>{ hint.style.transition='opacity 700ms'; hint.style.opacity='0'; setTimeout(()=>hint.remove(),800); },4000);
 }
 showFirstMoveHint();
@@ -266,10 +267,11 @@ function loop(){
     drawSky(sky, back, dt, innerWidth, innerHeight);
 
   let mvx=0,mvy=0;
-  if(keys['ArrowLeft']||keys['a']) mvx-=1;
-  if(keys['ArrowRight']||keys['d']) mvx+=1;
-  if(keys['ArrowUp']||keys['w']) mvy-=1;
-  if(keys['ArrowDown']||keys['s']) mvy+=1;
+  if(keys['a']) mvx-=1;
+  if(keys['d']) mvx+=1;
+  if(keys['w']) mvy-=1;
+  if(keys['s']) mvy+=1;
+  const looking = keys['ArrowLeft']||keys['ArrowRight']||keys['ArrowUp']||keys['ArrowDown'];
   // Only move if not in enemy turn
   if((mvx||mvy) && (!combat.active || combat.turn !== 'enemy')){
     const len=Math.hypot(mvx,mvy)||1; mvx/=len; mvy/=len;
@@ -284,6 +286,20 @@ function loop(){
     camX = party.leader.x - innerWidth/2;
     camY = party.leader.y - innerHeight/2;
     updateTerrainPill();
+  } else if(!looking) {
+    camX = party.leader.x - innerWidth/2;
+    camY = party.leader.y - innerHeight/2;
+  }
+
+  let lookX=0, lookY=0;
+  if(keys['ArrowLeft']) lookX-=1;
+  if(keys['ArrowRight']) lookX+=1;
+  if(keys['ArrowUp']) lookY-=1;
+  if(keys['ArrowDown']) lookY+=1;
+  if(lookX||lookY){
+    const len=Math.hypot(lookX,lookY)||1; lookX/=len; lookY/=len;
+    camX += lookX*LOOK_SPEED*dt;
+    camY += lookY*LOOK_SPEED*dt;
   }
   if(combat.active){
     combat.update(dt);
