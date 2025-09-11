@@ -225,8 +225,8 @@ function loop(){
   try {
     const now = performance.now(), dt = (now-last)/1000; last = now;
     // Clear canvases that accumulate drawing each frame.
-    // Without clearing, the fx layer's bloom/lights compound and the screen
-    // quickly washes out or turns black when bloom is toggled.
+    // Without clearing, the fx layer's lights compound and the screen
+    // quickly washes out.
     ctx.clearRect(0,0,innerWidth,innerHeight);
     fx.clearRect(0,0,innerWidth,innerHeight);
     back.clearRect(0,0,innerWidth,innerHeight); sky.clearRect(0,0,innerWidth,innerHeight);
@@ -284,9 +284,8 @@ function loop(){
 
   // no debug overlay in production
 
-  combat.drawLighting(fx, view, party.leader);
-    if(document.getElementById('bloom').checked) combat.compositeBloom(gameC, fxC, innerWidth, innerHeight);
-  } catch (err) {
+    combat.drawLighting(fx, view, party.leader);
+    } catch (err) {
     console.error('loop iteration failed', err);
   }
 }

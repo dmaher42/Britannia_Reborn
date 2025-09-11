@@ -57,11 +57,6 @@ export class CombatSystem {
     }
     fx.globalCompositeOperation='source-over';
   }
-  compositeBloom(gameC, fxC, W, H){
-    this.fx.save(); this.fx.globalCompositeOperation='lighter'; this.fx.filter='blur(6px)';
-    this.fx.drawImage(gameC,0,0,W,H); this.fx.drawImage(fxC,0,0,W,H);
-    this.fx.filter='none'; this.fx.restore();
-  }
 }
 
 function drawGrid(svg, show){
