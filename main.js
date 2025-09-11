@@ -23,6 +23,96 @@ let _loggedBoot = false;
 const DEBUG = false;
 let _lastDebugLog = 0;
 
+// Debug system initialization
+function initDebugSystem() {
+  // Parse URL for debug parameter
+  const urlParams = new URLSearchParams(window.location.search);
+  const debugEnabled = urlParams.get('debug') === '1';
+  
+  // Initialize debug object
+  window.__DBG = {
+    ENABLED: debugEnabled,
+    FORCE_MOVE: false,
+    FORCE_CAMERA: false,
+    PRINT_FREQ: 30, // frames between debug logs
+    _frameCount: 0
+  };
+  
+  // Convenience functions
+  window.enableForceMove = () => {
+    window.__DBG.FORCE_MOVE = true;
+    window.__DBG.ENABLED = true;
+    console.info('Debug: Force move enabled');
+  };
+  
+  window.disableForceMove = () => {
+    window.__DBG.FORCE_MOVE = false;
+    console.info('Debug: Force move disabled');
+  };
+  
+  window.enableForceCamera = () => {
+    window.__DBG.FORCE_CAMERA = true;
+    window.__DBG.ENABLED = true;
+    console.info('Debug: Force camera enabled');
+  };
+  
+  window.disableForceCamera = () => {
+    window.__DBG.FORCE_CAMERA = false;
+    console.info('Debug: Force camera disabled');
+  };
+  
+  window.enableDebugLogging = () => {
+    window.__DBG.ENABLED = true;
+    console.info('Debug: Logging enabled');
+  };
+  
+  window.disableDebugLogging = () => {
+    window.__DBG.ENABLED = false;
+    console.info('Debug: Logging disabled');
+  };
+  
+  window.setDebugPrintFreq = (freq) => {
+    window.__DBG.PRINT_FREQ = Math.max(1, Math.floor(freq));
+    console.info(`Debug: Print frequency set to ${window.__DBG.PRINT_FREQ} frames`);
+  };
+  
+  if (debugEnabled) {
+    console.info('Debug mode enabled via URL parameter');
+    console.info('Available debug commands:');
+    console.info('  enableForceMove() - Force continuous rightward movement');
+    console.info('  disableForceMove() - Disable forced movement');
+    console.info('  enableForceCamera() - Force camera panning');
+    console.info('  disableForceCamera() - Disable camera panning');
+    console.info('  enableDebugLogging() - Enable debug console output');
+    console.info('  disableDebugLogging() - Disable debug console output');
+    console.info('  setDebugPrintFreq(n) - Set debug log frequency');
+  }
+}
+
+// Debug snapshot function
+function __debugSnapshot(dt) {
+  if (!window.__DBG?.ENABLED && !window.__DBG?.FORCE_MOVE && !window.__DBG?.FORCE_CAMERA) return;
+  
+  window.__DBG._frameCount++;
+  if (window.__DBG._frameCount % window.__DBG.PRINT_FREQ !== 0) return;
+  
+  const leader = party.leader;
+  const pressedKeys = Object.entries(keys).filter(([k,v])=>v).map(([k])=>k);
+  
+  console.info('=== DEBUG SNAPSHOT ===');
+  console.info(`Frame: ${window.__DBG._frameCount}, dt: ${dt.toFixed(3)}s`);
+  console.info(`Leader pos: (${Math.round(leader.x)}, ${Math.round(leader.y)})`);
+  console.info(`Camera: (${Math.round(camX)}, ${Math.round(camY)})`);
+  console.info(`Combat: active=${combat.active}, turn=${combat.turn}`);
+  console.info(`Pressed keys: [${pressedKeys.join(', ')}]`);
+  console.info(`Speed: ${leader.speed().toFixed(1)}, overweight: ${leader.isOverweight()}`);
+  console.info(`Debug flags: FORCE_MOVE=${window.__DBG.FORCE_MOVE}, FORCE_CAMERA=${window.__DBG.FORCE_CAMERA}`);
+  console.info('=====================');
+}
+
+// Initialize debug system
+initDebugSystem();
+
 const party = new Party([
   { name:'Avatar', cls:CharacterClass.Avatar, STR:12, DEX:10, INT:9, hpMax:30, mpClass:true },
   { name:'Iolo', cls:CharacterClass.Bard, STR:9, DEX:12, INT:8,  hpMax:22 },
@@ -232,26 +322,46 @@ function loop(){
     back.clearRect(0,0,innerWidth,innerHeight); sky.clearRect(0,0,innerWidth,innerHeight);
     drawSky(sky, back, dt, innerWidth, innerHeight);
 
-  let mvx=0,mvy=0;
-  if(keys['ArrowLeft']||keys['a']) mvx-=1;
-  if(keys['ArrowRight']||keys['d']) mvx+=1;
-  if(keys['ArrowUp']||keys['w']) mvy-=1;
-  if(keys['ArrowDown']||keys['s']) mvy+=1;
-  // Only move if not in enemy turn
-  if((mvx||mvy) && (!combat.active || combat.turn !== 'enemy')){
-    const len=Math.hypot(mvx,mvy)||1; mvx/=len; mvy/=len;
-    const terr = TERRAIN.at(Math.floor(party.leader.x/TILE), Math.floor(party.leader.y/TILE));
-    let s = party.leader.speed();
-    if(terr.key==='SWAMP'){ s*=0.7; if(Math.random()<0.02){ party.leader.applyPoison(1); } }
-    if(terr.key==='FOREST'){ s*=0.86; }
-    if(terr.key==='ROAD'){ s*=1.22; }
-    if(terr.key==='WATER'){ s*=0.5; }
-    if(terr.key==='SAND'){ s*=0.92; }
-    party.move(mvx*s*dt, mvy*s*dt);
-    camX = party.leader.x - innerWidth/2;
-    camY = party.leader.y - innerHeight/2;
-    updateTerrainPill();
-  }
+    // Debug: Force movement (bypasses input and combat checks)
+    if (window.__DBG?.FORCE_MOVE) {
+      const testSpeed = 200; // Fixed speed for debug movement
+      party.move(testSpeed * dt, 0); // Move right continuously
+      camX = party.leader.x - innerWidth/2;
+      camY = party.leader.y - innerHeight/2;
+      updateTerrainPill();
+    }
+
+    // Normal movement logic (only if not force moving)
+    if (!window.__DBG?.FORCE_MOVE) {
+      let mvx=0,mvy=0;
+      if(keys['ArrowLeft']||keys['a']) mvx-=1;
+      if(keys['ArrowRight']||keys['d']) mvx+=1;
+      if(keys['ArrowUp']||keys['w']) mvy-=1;
+      if(keys['ArrowDown']||keys['s']) mvy+=1;
+      // Only move if not in enemy turn
+      if((mvx||mvy) && (!combat.active || combat.turn !== 'enemy')){
+        const len=Math.hypot(mvx,mvy)||1; mvx/=len; mvy/=len;
+        const terr = TERRAIN.at(Math.floor(party.leader.x/TILE), Math.floor(party.leader.y/TILE));
+        let s = party.leader.speed();
+        if(terr.key==='SWAMP'){ s*=0.7; if(Math.random()<0.02){ party.leader.applyPoison(1); } }
+        if(terr.key==='FOREST'){ s*=0.86; }
+        if(terr.key==='ROAD'){ s*=1.22; }
+        if(terr.key==='WATER'){ s*=0.5; }
+        if(terr.key==='SAND'){ s*=0.92; }
+        party.move(mvx*s*dt, mvy*s*dt);
+        camX = party.leader.x - innerWidth/2;
+        camY = party.leader.y - innerHeight/2;
+        updateTerrainPill();
+      }
+    }
+
+    // Debug: Force camera panning (independent of player movement)
+    if (window.__DBG?.FORCE_CAMERA) {
+      const cameraSpeed = 100; // Fixed camera pan speed
+      camX += cameraSpeed * dt;
+      // Optional: also pan vertically
+      // camY += cameraSpeed * dt * 0.5;
+    }
   if(combat.active){
     combat.update(dt);
   }
@@ -274,6 +384,28 @@ function loop(){
     console.error('party.draw failed', err && err.stack ? err.stack : err);
   }
   combat.draw(ctx, fx, view);
+  
+  // Debug crosshair (red center marker when debug enabled)
+  if (window.__DBG?.ENABLED || window.__DBG?.FORCE_MOVE || window.__DBG?.FORCE_CAMERA) {
+    ctx.save();
+    ctx.strokeStyle = '#ff0000';
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 0.8;
+    const centerX = innerWidth / 2;
+    const centerY = innerHeight / 2;
+    const size = 12;
+    ctx.beginPath();
+    ctx.moveTo(centerX - size, centerY);
+    ctx.lineTo(centerX + size, centerY);
+    ctx.moveTo(centerX, centerY - size);
+    ctx.lineTo(centerX, centerY + size);
+    ctx.stroke();
+    ctx.restore();
+  }
+  
+  // Debug logging
+  __debugSnapshot(dt);
+  
   if (DEBUG && now - _lastDebugLog > 1000) {
     console.info('Key listeners attached:', window);
     console.info('Party size:', party.size, 'Leader coords:', party.leader.x, party.leader.y);
