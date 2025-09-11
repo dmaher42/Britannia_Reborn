@@ -4,7 +4,7 @@ A modern, browser‑based reimagining of classic Britannia with an AI‑driven n
 
 ## Quick Start
 - Open `index.html` directly in your browser (or the GitHub Pages URL).
-- Click the game once to focus (if needed), then use WASD/Arrow keys to move immediately.
+- Click the game once to focus (if needed), then use WASD or the Arrow keys to move. Hold **Shift** + Arrow to look around.
 ## Troubleshooting
 If movement does not work (blank or stuck):
 - Ensure the game canvas is focused (click once if needed).

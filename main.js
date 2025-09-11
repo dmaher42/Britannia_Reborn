@@ -149,7 +149,7 @@ const gameCanvas = document.getElementById('game');
 const focusOverlay = document.getElementById('focusOverlay');
 function showFocusOverlay() {
   focusOverlay.style.display = 'block';
-  focusOverlay.textContent = 'Click to refocus · WASD to move · Arrows to look';
+  focusOverlay.textContent = 'Click to refocus · WASD/Arrows to move · Shift+Arrows to look';
 }
 function hideFocusOverlay() {
   focusOverlay.style.display = 'none';
@@ -240,9 +240,11 @@ addEventListener('keydown', (e)=>{ if(e.key==='h' || e.key==='H'){ heroMarkerVis
 // First-move hint
 function showFirstMoveHint(){
   const hint = document.createElement('div');
-  hint.id = 'firstMoveHint'; hint.style.position='fixed'; hint.style.left='12px'; hint.style.bottom='12px'; hint.style.padding='8px 12px';
+  hint.id = 'firstMoveHint';
+  hint.style.position='fixed'; hint.style.left='12px'; hint.style.bottom='12px'; hint.style.padding='8px 12px';
   hint.style.background='rgba(0,0,0,0.6)'; hint.style.color='#fff'; hint.style.borderRadius='6px'; hint.style.zIndex=9999;
-  hint.textContent = 'Move with WASD · Look with Arrows'; document.body.appendChild(hint);
+  hint.textContent = 'Move with WASD or Arrows · Hold Shift to look';
+  document.body.appendChild(hint);
   setTimeout(()=>{ hint.style.transition='opacity 700ms'; hint.style.opacity='0'; setTimeout(()=>hint.remove(),800); },4000);
 }
 showFirstMoveHint();
@@ -267,13 +269,13 @@ function loop(){
     drawSky(sky, back, dt, innerWidth, innerHeight);
 
   let mvx=0,mvy=0;
-  if(keys['a']) mvx-=1;
-  if(keys['d']) mvx+=1;
-  if(keys['w']) mvy-=1;
-  if(keys['s']) mvy+=1;
-  const looking = keys['ArrowLeft']||keys['ArrowRight']||keys['ArrowUp']||keys['ArrowDown'];
-  // Only move if not in enemy turn
-  if((mvx||mvy) && (!combat.active || combat.turn !== 'enemy')){
+  if(keys['a'] || keys['ArrowLeft']) mvx-=1;
+  if(keys['d'] || keys['ArrowRight']) mvx+=1;
+  if(keys['w'] || keys['ArrowUp']) mvy-=1;
+  if(keys['s'] || keys['ArrowDown']) mvy+=1;
+  const looking = keys['Shift'] && (keys['ArrowLeft']||keys['ArrowRight']||keys['ArrowUp']||keys['ArrowDown']);
+  // Only move if not in enemy turn and not looking
+  if((mvx||mvy) && !looking && (!combat.active || combat.turn !== 'enemy')){
     const len=Math.hypot(mvx,mvy)||1; mvx/=len; mvy/=len;
     const terr = TERRAIN.at(Math.floor(party.leader.x/TILE), Math.floor(party.leader.y/TILE));
     let s = party.leader.speed();
@@ -291,15 +293,17 @@ function loop(){
     camY = party.leader.y - innerHeight/2;
   }
 
-  let lookX=0, lookY=0;
-  if(keys['ArrowLeft']) lookX-=1;
-  if(keys['ArrowRight']) lookX+=1;
-  if(keys['ArrowUp']) lookY-=1;
-  if(keys['ArrowDown']) lookY+=1;
-  if(lookX||lookY){
-    const len=Math.hypot(lookX,lookY)||1; lookX/=len; lookY/=len;
-    camX += lookX*LOOK_SPEED*dt;
-    camY += lookY*LOOK_SPEED*dt;
+  if(looking){
+    let lookX=0, lookY=0;
+    if(keys['ArrowLeft']) lookX-=1;
+    if(keys['ArrowRight']) lookX+=1;
+    if(keys['ArrowUp']) lookY-=1;
+    if(keys['ArrowDown']) lookY+=1;
+    if(lookX||lookY){
+      const len=Math.hypot(lookX,lookY)||1; lookX/=len; lookY/=len;
+      camX += lookX*LOOK_SPEED*dt;
+      camY += lookY*LOOK_SPEED*dt;
+    }
   }
   if(combat.active){
     combat.update(dt);
