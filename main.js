@@ -116,7 +116,7 @@ const gameCanvas = document.getElementById('game');
 const focusOverlay = document.getElementById('focusOverlay');
 function showFocusOverlay() {
   focusOverlay.style.display = 'block';
-  focusOverlay.textContent = 'Click to focus · Use WASD/Arrows to move';
+  focusOverlay.textContent = 'Click to refocus · Use WASD/Arrows to move';
 }
 function hideFocusOverlay() {
   focusOverlay.style.display = 'none';
@@ -132,7 +132,10 @@ gameCanvas.addEventListener('mousedown', () => { gameCanvas.focus(); });
 gameCanvas.addEventListener('touchstart', () => { gameCanvas.focus(); });
 window.addEventListener('focus', checkFocus);
 window.addEventListener('blur', checkFocus);
-document.addEventListener('DOMContentLoaded', checkFocus);
+document.addEventListener('DOMContentLoaded', () => {
+  gameCanvas.focus();
+  checkFocus();
+});
 setTimeout(checkFocus, 500);
 
 document.getElementById('btnTalk').onclick = async () => {
