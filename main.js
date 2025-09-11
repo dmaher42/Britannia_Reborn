@@ -152,6 +152,7 @@ document.getElementById('btnTalk').onclick = async () => {
 };
 document.getElementById('btnCombat').onclick = ()=>combat.startSkirmish();
 document.getElementById('btnCast').onclick = ()=>{
+  if(combat.active && combat.turn !== 'player') return showToast('Wait for your turn');
   const caster = party.members[0];
   if(!spells.canCast('fire_dart', caster)) return showToast('Need Sulfur Ash + Black Pearl and MP');
   castFireDart(caster, combat, ctx, fx, inventory, spells);
