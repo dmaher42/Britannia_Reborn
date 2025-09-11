@@ -1,23 +1,30 @@
 const CACHE_VERSION = 'v1';
 const STATIC_CACHE = `static-${CACHE_VERSION}`;
 const ASSETS = [
-  '/',
-  '/index.html',
-  '/style.css',
-  '/main.js',
-  '/world.js',
-  '/party.js',
-  '/inventory.js',
-  '/spells.js',
-  '/combat.js',
-  '/ui.js',
-  '/ai.js',
-  '/selection.js'
+  'index.html',
+  'style.css',
+  'main.js',
+  'world.js',
+  'party.js',
+  'inventory.js',
+  'spells.js',
+  'combat.js',
+  'ui.js',
+  'ai.js',
+  'selection.js'
 ];
 
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(STATIC_CACHE).then(cache => cache.addAll(ASSETS))
+    caches.open(STATIC_CACHE).then(cache =>
+      Promise.all(
+        ASSETS.map(url =>
+          cache.add(url).catch(err =>
+            console.warn('Failed to cache', url, err)
+          )
+        )
+      )
+    )
   );
 });
 
