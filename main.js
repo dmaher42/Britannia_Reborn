@@ -1,5 +1,5 @@
 import { drawSky, drawWorld, TERRAIN, TILE } from './world.js';
-import { Party, CharacterClass } from './party.js';
+import { Party, CharacterClass, Character } from './party.js';
 import { Inventory } from './inventory.js';
 import { Spellbook, castFireDart } from './spells.js';
 import { CombatSystem } from './combat.js';
@@ -40,6 +40,32 @@ function placePartyAtScreenCenter(){
   });
 }
 placePartyAtScreenCenter();
+
+// NPCs present at Lord British's castle
+const npcs = [
+  Object.assign(
+    new Character({ name:'Lord British', cls:CharacterClass.Paladin, STR:15, DEX:12, INT:15, hpMax:40 }),
+    {
+      profession:'Monarch',
+      town:'Britain',
+      personality:'regal and wise'
+    }
+  ),
+  Object.assign(
+    new Character({ name:'Gargoyle', cls:CharacterClass.Fighter, STR:13, DEX:9, INT:8, hpMax:30 }),
+    {
+      profession:'Warrior',
+      town:'Unknown',
+      personality:'stern and enigmatic'
+    }
+  )
+];
+function placeNPCs(){
+  const cx = innerWidth/2, cy = innerHeight/2;
+  if(npcs[0]){ npcs[0].x = cx + 80; npcs[0].y = cy - 40; }
+  if(npcs[1]){ npcs[1].x = cx - 80; npcs[1].y = cy + 40; }
+}
+placeNPCs();
 
 const inventory = new Inventory();
 inventory.gold = 125;
@@ -145,17 +171,24 @@ document.addEventListener('DOMContentLoaded', () => {
 setTimeout(checkFocus, 500);
 
 document.getElementById('btnTalk').onclick = async () => {
-  const npc = { name:'Britain Guard', profession:'Guard', town:'Britain', personality:'formal, dutiful' };
-  const worldState = { trinsicSiege:false, time: Date.now() };
+  const player = party.leader;
+  let closest=null, dist=Infinity;
+  for(const n of npcs){
+    const d = Math.hypot(n.x - player.x, n.y - player.y);
+    if(d < dist){ dist=d; closest=n; }
+  }
+  if(!closest || dist>120){
+    return pushBubble('System','No one nearby to talk to.');
+  }
+  const npc = { name: closest.name, profession: closest.profession, town: closest.town, personality: closest.personality };
+  const worldState = { location:"Lord British's Castle", time: Date.now() };
   const questState = party.activeQuests;
-  const playerState = { name: party.members[0].name, karma: party.karma, items: inventory.summary() };
-  pushBubble('Britain Guard', 'Halt! State thy business in Britain.');
-  const playerInput = getSelectedText(window.getSelection()) || 'We seek news and work.';
+  const playerState = { name: player.name, karma: party.karma, items: inventory.summary() };
+  const greeting = closest.name === 'Gargoyle' ? 'Grrr... Avatar...' : 'Welcome to my castle, Avatar.';
+  pushBubble(closest.name, greeting);
+  const playerInput = getSelectedText(window.getSelection()) || 'Greetings.';
   const { text } = await talkToNPC(npc, worldState, playerState, questState, playerInput);
-  pushBubble('Britain Guard', text);
-  pushActions([
-    {label:'Accept Quest', fn:()=>{ pushBubble('System','Quest Accepted: Clear bandits by the northern bridge.'); party.acceptQuest({id:'bandits_bridge', name:'Clear the Bandits'}); updatePartyUI(party);}}
-  ]);
+  pushBubble(closest.name, text);
 };
 document.getElementById('btnCombat').onclick = ()=>combat.startSkirmish();
 document.getElementById('btnCast').onclick = ()=>{
@@ -267,6 +300,7 @@ function loop(){
       console.info('Render loop starting. party.size=', party.size, 'leader=', party.leader && {x:Math.round(party.leader.x), y:Math.round(party.leader.y)} );
       _loggedBoot = true;
     }
+  npcs.forEach(n=>n.draw(ctx, view));
   party.draw(ctx, view);
   // Draw Hero Marker and nameplate after party
   drawHeroMarker(ctx, view, party.leader);
