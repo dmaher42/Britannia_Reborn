@@ -52,14 +52,29 @@ const combat = new CombatSystem(party, inventory, spells, gameC, ctx, fx, gridLa
 
 // Keyboard input: bind to window
 export const keys = Object.create(null);
+
+function normalizeKey(k) {
+  const map = {
+    Left: 'ArrowLeft',
+    Right: 'ArrowRight',
+    Up: 'ArrowUp',
+    Down: 'ArrowDown',
+    ' ': ' ',
+    Spacebar: ' ',
+    Space: ' '
+  };
+  if (k in map) return map[k];
+  return k.length === 1 ? k.toLowerCase() : k;
+}
+
 // Prevent default browser behavior (e.g., page scrolling) on key events
 window.addEventListener('keydown', e => {
-  const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  const key = normalizeKey(e.key);
   keys[key] = true;
   e.preventDefault();
 });
 window.addEventListener('keyup', e => {
-  const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  const key = normalizeKey(e.key);
   keys[key] = false;
   e.preventDefault();
 });
