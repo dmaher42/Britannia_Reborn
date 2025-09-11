@@ -4,6 +4,7 @@ import { Inventory } from './inventory.js';
 import { Spellbook, castFireDart } from './spells.js';
 import { CombatSystem } from './combat.js';
 import { pushBubble, pushActions, showToast, updatePartyUI, updateInventoryUI, gridLayer } from './ui.js';
+import { getSelectedText } from './selection.js';
 import { talkToNPC } from './ai.js';
 
 const dpr = Math.min(window.devicePixelRatio||1, 2);
@@ -149,7 +150,8 @@ document.getElementById('btnTalk').onclick = async () => {
   const questState = party.activeQuests;
   const playerState = { name: party.members[0].name, karma: party.karma, items: inventory.summary() };
   pushBubble('Britain Guard', 'Halt! State thy business in Britain.');
-  const { text } = await talkToNPC(npc, worldState, playerState, questState, 'We seek news and work.');
+  const playerInput = getSelectedText(window.getSelection()) || 'We seek news and work.';
+  const { text } = await talkToNPC(npc, worldState, playerState, questState, playerInput);
   pushBubble('Britain Guard', text);
   pushActions([
     {label:'Accept Quest', fn:()=>{ pushBubble('System','Quest Accepted: Clear bandits by the northern bridge.'); party.acceptQuest({id:'bandits_bridge', name:'Clear the Bandits'}); updatePartyUI(party);}}
