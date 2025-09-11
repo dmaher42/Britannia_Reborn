@@ -12,7 +12,7 @@ const backC = document.getElementById('back'), back = backC.getContext('2d');
 const gameC = document.getElementById('game'), ctx = gameC.getContext('2d',{alpha:false});
 const fxC = document.getElementById('fx'), fx = fxC.getContext('2d');
 function sizeCanvas(c){ c.width = innerWidth * dpr; c.height = innerHeight * dpr; c.style.width = innerWidth+'px'; c.style.height = innerHeight+'px'; c.getContext('2d').setTransform(dpr,0,0,dpr,0,0); }
-function onResize(){ [skyC,backC,gameC,fxC].forEach(sizeCanvas); centerCameraOnLeader(); }
+function onResize(){ [skyC,backC,gameC,fxC].forEach(sizeCanvas); }
 addEventListener('resize', onResize);
 
 let camX = -innerWidth/2, camY = -innerHeight/2;
@@ -156,6 +156,7 @@ function centerCameraOnLeader(){
   console.info('Boot: party size=', party.size, 'leader=', party.leader.name, 'coords=', Math.round(party.leader.x), Math.round(party.leader.y));
 }
 onResize();
+centerCameraOnLeader();
 
 // Ensure party members have sensible world coordinates (place near screen center)
 // Keep party positions as initialized by Party constructor; no forced repositioning here.
@@ -221,8 +222,8 @@ function loop(){
     if(terr.key==='WATER'){ s*=0.5; }
     if(terr.key==='SAND'){ s*=0.92; }
     party.move(mvx*s*dt, mvy*s*dt);
-    camX += mvx * s * dt;
-    camY += mvy * s * dt;
+    camX = party.leader.x - innerWidth/2;
+    camY = party.leader.y - innerHeight/2;
     updateTerrainPill();
   }
   if(combat.active){
