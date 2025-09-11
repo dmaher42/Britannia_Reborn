@@ -23,6 +23,35 @@ let _loggedBoot = false;
 const DEBUG = false;
 let _lastDebugLog = 0;
 
+// Debug System Bootstrap
+function initDebugSystem() {
+  // Parse URL for debug=1 parameter
+  const urlParams = new URLSearchParams(window.location.search);
+  const debugEnabled = urlParams.get('debug') === '1';
+  
+  // Initialize debug object
+  window.__DBG = {
+    ENABLED: debugEnabled,
+    FORCE_MOVE: false,
+    FORCE_CAMERA: false,
+    TEST_SPEED: 120,
+    PRINT_FREQ: 30,
+    lastSnapshot: null,
+    frameCounter: 0
+  };
+  
+  // Guard against early access
+  if (!window.__DBG) return;
+  
+  console.info('[DEBUG] Debug system initialized. ENABLED:', window.__DBG.ENABLED);
+  if (window.__DBG.ENABLED) {
+    console.info('[DEBUG] Use ` key to toggle, window.enableDebug(), window.disableDebug()');
+  }
+}
+
+// Initialize debug system immediately
+initDebugSystem();
+
 const party = new Party([
   { name:'Avatar', cls:CharacterClass.Avatar, STR:12, DEX:10, INT:9, hpMax:30, mpClass:true },
   { name:'Iolo', cls:CharacterClass.Bard, STR:9, DEX:12, INT:8,  hpMax:22 },
@@ -50,6 +79,37 @@ inventory.add({ id:'healing_potion', name:'Potion of Healing', weight:0.2, qty:1
 const spells = new Spellbook(inventory, party);
 
 const combat = new CombatSystem(party, inventory, spells, gameC, ctx, fx, gridLayer);
+
+// Debug Helper Functions
+function enableDebug() {
+  if (!window.__DBG) return;
+  window.__DBG.ENABLED = true;
+  console.info('[DEBUG] Debug mode enabled. Snapshot logging active.');
+}
+
+function disableDebug() {
+  if (!window.__DBG) return;
+  window.__DBG.ENABLED = false;
+  console.info('[DEBUG] Debug mode disabled.');
+}
+
+function forceMove(on) {
+  if (!window.__DBG) return;
+  window.__DBG.FORCE_MOVE = !!on;
+  console.info('[DEBUG] Force move:', window.__DBG.FORCE_MOVE ? 'ON' : 'OFF');
+}
+
+function forceCamera(on) {
+  if (!window.__DBG) return;
+  window.__DBG.FORCE_CAMERA = !!on;
+  console.info('[DEBUG] Force camera:', window.__DBG.FORCE_CAMERA ? 'ON' : 'OFF');
+}
+
+// Export debug helpers to window
+window.enableDebug = enableDebug;
+window.disableDebug = disableDebug;
+window.forceMove = forceMove;
+window.forceCamera = forceCamera;
 
 // Keyboard input: bind to window
 export const keys = Object.create(null);
@@ -174,6 +234,18 @@ document.getElementById('btnAddLoot').onclick = ()=>{
 updatePartyUI(party);
 updateInventoryUI(inventory, party);
 
+// Export core references for debugging (development only)
+if (window.__DBG) {
+  window.__DBG_REFS = {
+    party,
+    combat,
+    keys,
+    inventory,
+    spells
+  };
+  console.info('[DEBUG] Core references exported to window.__DBG_REFS');
+}
+
 // Center camera on leader at boot and ensure leader is within view
 function centerCameraOnLeader(){
   if(!party.leader) return;
@@ -203,6 +275,15 @@ function drawHeroMarker(ctx, view, leader){
 // Dev toggle: press H to hide/show hero marker
 addEventListener('keydown', (e)=>{ if(e.key==='h' || e.key==='H'){ heroMarkerVisible = !heroMarkerVisible; console.info('Hero marker visible=', heroMarkerVisible); } });
 
+// Debug toggle: press backtick (`) to toggle debug mode
+addEventListener('keydown', (e) => {
+  if (e.key === '`' || e.key === '~') {
+    if (!window.__DBG) return;
+    window.__DBG.ENABLED = !window.__DBG.ENABLED;
+    console.info('[DEBUG] Debug toggled:', window.__DBG.ENABLED ? 'ON' : 'OFF');
+  }
+});
+
 // First-move hint
 function showFirstMoveHint(){
   const hint = document.createElement('div');
@@ -224,6 +305,12 @@ function loop(){
   requestAnimationFrame(loop);
   try {
     const now = performance.now(), dt = (now-last)/1000; last = now;
+    
+    // Debug: Increment frame counter
+    if (window.__DBG) {
+      window.__DBG.frameCounter++;
+    }
+    
     // Clear canvases that accumulate drawing each frame.
     // Without clearing, the fx layer's bloom/lights compound and the screen
     // quickly washes out or turns black when bloom is toggled.
@@ -232,11 +319,28 @@ function loop(){
     back.clearRect(0,0,innerWidth,innerHeight); sky.clearRect(0,0,innerWidth,innerHeight);
     drawSky(sky, back, dt, innerWidth, innerHeight);
 
+  // Debug: Apply forced movement and camera BEFORE normal input processing
+  let debugMvx = 0, debugMvy = 0, debugCamDx = 0;
+  if (window.__DBG) {
+    if (window.__DBG.FORCE_MOVE) {
+      debugMvx = 1; // Move right steadily
+      console.info('[DEBUG] Forcing movement right');
+    }
+    if (window.__DBG.FORCE_CAMERA) {
+      debugCamDx = window.__DBG.TEST_SPEED * dt; // Scroll camera horizontally
+      console.info('[DEBUG] Forcing camera scroll, dx:', debugCamDx);
+    }
+  }
+
   let mvx=0,mvy=0;
   if(keys['ArrowLeft']||keys['a']) mvx-=1;
   if(keys['ArrowRight']||keys['d']) mvx+=1;
   if(keys['ArrowUp']||keys['w']) mvy-=1;
   if(keys['ArrowDown']||keys['s']) mvy+=1;
+  
+  // Apply debug movement (forced movement combines with normal input)
+  mvx += debugMvx;
+  mvy += debugMvy;
   // Only move if not in enemy turn
   if((mvx||mvy) && (!combat.active || combat.turn !== 'enemy')){
     const len=Math.hypot(mvx,mvy)||1; mvx/=len; mvy/=len;
@@ -251,6 +355,11 @@ function loop(){
     camX = party.leader.x - innerWidth/2;
     camY = party.leader.y - innerHeight/2;
     updateTerrainPill();
+  }
+  
+  // Debug: Apply forced camera movement
+  if (window.__DBG && window.__DBG.FORCE_CAMERA) {
+    camX += debugCamDx;
   }
   if(combat.active){
     combat.update(dt);
@@ -274,6 +383,25 @@ function loop(){
     console.error('party.draw failed', err && err.stack ? err.stack : err);
   }
   combat.draw(ctx, fx, view);
+  
+  // Debug: Periodic snapshot logging
+  if (window.__DBG && (window.__DBG.ENABLED || window.__DBG.FORCE_MOVE || window.__DBG.FORCE_CAMERA)) {
+    if (window.__DBG.frameCounter % window.__DBG.PRINT_FREQ === 0) {
+      const pressedKeys = Object.keys(keys).filter(k => keys[k]);
+      const snapshot = {
+        frame: window.__DBG.frameCounter,
+        leader: { x: Math.round(party.leader.x), y: Math.round(party.leader.y) },
+        camera: { camX: Math.round(camX), camY: Math.round(camY) },
+        combat: { active: combat.active, turn: combat.turn },
+        pressedKeys,
+        dt: dt.toFixed(3)
+      };
+      window.__DBG.lastSnapshot = snapshot;
+      console.info('[DEBUG] Snapshot:', snapshot);
+    }
+  }
+  
+  // Legacy debug logging (keeping for compatibility)
   if (DEBUG && now - _lastDebugLog > 1000) {
     console.info('Key listeners attached:', window);
     console.info('Party size:', party.size, 'Leader coords:', party.leader.x, party.leader.y);
@@ -282,7 +410,23 @@ function loop(){
 
   if (showKeyOverlay) updateKeyOverlay();
 
-  // no debug overlay in production
+  // Debug: Draw crosshair at screen center when debug enabled
+  if (window.__DBG && window.__DBG.ENABLED) {
+    ctx.save();
+    ctx.strokeStyle = '#ff4040';
+    ctx.globalAlpha = 0.8;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    const centerX = innerWidth / 2;
+    const centerY = innerHeight / 2;
+    // Draw small crosshair
+    ctx.moveTo(centerX - 10, centerY);
+    ctx.lineTo(centerX + 10, centerY);
+    ctx.moveTo(centerX, centerY - 10);
+    ctx.lineTo(centerX, centerY + 10);
+    ctx.stroke();
+    ctx.restore();
+  }
 
   combat.drawLighting(fx, view, party.leader);
     if(document.getElementById('bloom').checked) combat.compositeBloom(gameC, fxC, innerWidth, innerHeight);
