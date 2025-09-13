@@ -6,6 +6,8 @@ import { CombatSystem } from './combat.js';
 import { pushBubble, pushActions, showToast, updatePartyUI, updateInventoryUI, gridLayer } from './ui.js';
 import { getSelectedText } from './selection.js';
 import { talkToNPC } from './ai.js';
+import { renderer, scene, camera } from './renderer.js';
+import { raycastTileFromScreen, setHighlightGrid, hideHighlight, updateHighlight } from './world3d.js';
 
 const dpr = Math.min(window.devicePixelRatio||1, 2);
 const skyC = document.getElementById('sky'), sky = skyC.getContext('2d');
@@ -344,3 +346,37 @@ function loop(){
   }
 }
 requestAnimationFrame(loop);
+
+function moveHeroToTile(x, z){
+  console.log('moveHeroToTile', x, z);
+}
+
+if (renderer && renderer.domElement){
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(renderer.domElement);
+
+  const dom = renderer.domElement;
+  dom.addEventListener('pointermove', e => {
+    const rect = dom.getBoundingClientRect();
+    const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    const ny = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    const hit = raycastTileFromScreen(nx, ny, camera);
+    if(hit) setHighlightGrid(hit.gridX, hit.gridZ);
+    else hideHighlight();
+  });
+
+  dom.addEventListener('click', e => {
+    const rect = dom.getBoundingClientRect();
+    const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    const ny = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    const hit = raycastTileFromScreen(nx, ny, camera);
+    if(hit) moveHeroToTile(hit.gridX, hit.gridZ);
+  });
+
+  function loop3d(){
+    requestAnimationFrame(loop3d);
+    updateHighlight();
+    renderer.render(scene, camera);
+  }
+  loop3d();
+}
