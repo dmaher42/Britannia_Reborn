@@ -6,6 +6,9 @@ import { CombatSystem } from './combat.js';
 import { pushBubble, pushActions, showToast, updatePartyUI, updateInventoryUI, gridLayer } from './ui.js';
 import { getSelectedText } from './selection.js';
 import { talkToNPC } from './ai.js';
+import { initRenderer, renderer, scene, camera, render } from './renderer.js';
+import { initWorld3D, updateWorld3D, raycastTileFromScreen, setHighlightGrid, hideHighlight, moveHeroToTile } from './world3d.js';
+import { initControls, updateControls } from './controls.js';
 
 const dpr = Math.min(window.devicePixelRatio||1, 2);
 const skyC = document.getElementById('sky'), sky = skyC.getContext('2d');
@@ -344,3 +347,29 @@ function loop(){
   }
 }
 requestAnimationFrame(loop);
+
+// 3D tile demo
+const { cameraRig } = initRenderer();
+const { world } = initWorld3D(8,8);
+scene.add(world);
+initControls({ width:8, depth:8, cameraRig });
+
+let last3d = performance.now();
+function loop3d(now){
+  requestAnimationFrame(loop3d);
+  const dt = (now - last3d)/1000; last3d = now;
+  updateControls(dt);
+  updateWorld3D(dt);
+  render();
+}
+requestAnimationFrame(loop3d);
+
+renderer.domElement.addEventListener('pointermove', e=>{
+  const hit = raycastTileFromScreen(e.clientX, e.clientY, camera);
+  if(hit) setHighlightGrid(hit.gridX, hit.gridZ);
+  else hideHighlight();
+});
+renderer.domElement.addEventListener('click', e=>{
+  const hit = raycastTileFromScreen(e.clientX, e.clientY, camera);
+  if(hit) moveHeroToTile(hit.gridX, hit.gridZ);
+});

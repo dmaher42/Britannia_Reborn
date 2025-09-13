@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { renderer } from './renderer.js';
 
 export const TILE_TYPES = {
   grass: 0x3a5d2a,
@@ -8,13 +9,16 @@ export const TILE_TYPES = {
 };
 
 let width = 0, depth = 0;
-let tileMesh, hero, worldGroup;
+let tileMesh, hero, worldGroup, highlight;
 let cameraRig = null;
+let highlightTarget = 0;
 
 const matrix = new THREE.Matrix4();
 const color = new THREE.Color();
 const tileColors = [];
 const raycaster = new THREE.Raycaster();
+const groundNormal = new THREE.Vector3(0,1,0);
+const groundPlane = new THREE.Plane(groundNormal, 0);
 
 export function initWorld3D(w = 32, d = 32) {
   width = w; depth = d;
@@ -47,6 +51,21 @@ export function initWorld3D(w = 32, d = 32) {
   hero.position.set(0.5, 0.3, 0.5);
   worldGroup.add(hero);
 
+  const hlGeo = new THREE.PlaneGeometry(1.05,1.05);
+  hlGeo.rotateX(-Math.PI/2);
+  const hlMat = new THREE.MeshStandardMaterial({
+    color:0xffff66,
+    emissive:0xffff66,
+    transparent:true,
+    opacity:0
+  });
+  highlight = new THREE.Mesh(hlGeo, hlMat);
+  highlight.position.y = 0.01;
+  highlight.renderOrder = 999;
+  highlight.castShadow = false;
+  highlight.receiveShadow = false;
+  worldGroup.add(highlight);
+
   return { world: worldGroup, tiles: tileMesh, hero };
 }
 
@@ -61,6 +80,11 @@ export function updateWorld3D(dt){
   if(cameraRig && hero){
     const target = new THREE.Vector3(hero.position.x, 0, hero.position.z);
     cameraRig.position.lerp(target, Math.min(1, dt * 5));
+  }
+  if(highlight){
+    const mat = highlight.material;
+    mat.opacity += (highlightTarget - mat.opacity) * Math.min(1, dt * 10);
+    highlight.visible = mat.opacity > 0.01;
   }
 }
 
@@ -77,16 +101,32 @@ export function getTileColor(x, z){
   return tileColors[index];
 }
 
-export function raycastTile(ndcX, ndcY, camera){
-  if(!tileMesh) return null;
+export function getInstanceIndexForGrid(x, z){
+  return z * width + x;
+}
+
+export function raycastTileFromScreen(x, y, camera){
+  if(!renderer) return null;
+  const rect = renderer.domElement.getBoundingClientRect();
+  const ndcX = (x - rect.left) / rect.width * 2 - 1;
+  const ndcY = -(y - rect.top) / rect.height * 2 + 1;
   raycaster.setFromCamera({x:ndcX, y:ndcY}, camera);
-  const hit = raycaster.intersectObject(tileMesh, true)[0];
-  if(!hit) return null;
-  const p = hit.point;
-  const tx = Math.floor(p.x);
-  const tz = Math.floor(p.z);
-  if(tx<0||tz<0||tx>=width||tz>=depth) return null;
-  return { x: tx, z: tz, index: tz*width + tx };
+  const p = raycaster.ray.intersectPlane(groundPlane, new THREE.Vector3());
+  if(!p) return null;
+  const gridX = Math.floor(p.x);
+  const gridZ = Math.floor(p.z);
+  if(gridX<0||gridZ<0||gridX>=width||gridZ>=depth) return null;
+  return { index:getInstanceIndexForGrid(gridX,gridZ), gridX, gridZ };
+}
+
+export function setHighlightGrid(x,z){
+  if(!highlight) return;
+  highlight.position.set(x+0.5,0.01,z+0.5);
+  highlightTarget = 0.4;
+}
+
+export function hideHighlight(){
+  highlightTarget = 0;
 }
 
 export function getHeroWorldPos(){

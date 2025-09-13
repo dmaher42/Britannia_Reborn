@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-let renderer, scene, camera, cameraRig;
+export let renderer, scene, camera, cameraRig;
 
 export function initRenderer(container=document.body){
   renderer = new THREE.WebGLRenderer({ antialias:true });
