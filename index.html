@@ -12,7 +12,7 @@
     <canvas id="back"></canvas>
   <canvas id="game" tabindex="0"></canvas>
   <canvas id="fx"></canvas>
-  <div id="focusOverlay" style="display:none;position:absolute;left:0;top:0;width:100vw;height:100vh;z-index:1000;pointer-events:none;text-align:center;font:16px sans-serif;color:#fff;background:rgba(0,0,0,0.25)"></div>
+  <div id="focusOverlay" style="display:none;position:absolute;left:0;top:0;width:100vw;height:100vh;z-index:1000;pointer-events:none;text-align:center;font:16px sans-serif;color:#fff;background:rgba(0,0,0,0.25)">Click to focus</div>
     <svg class="gridOverlay" id="gridOverlay"></svg>
     <div class="vignette"></div>
 
@@ -52,14 +52,53 @@
     <div class="watermark">Local ES‑Modules Prototype — AI optional via server</div>
   </div>
 
-  <script type="module" src="main.js"></script>
-
+  <script type="module" src="./main.js?v=" id="game-script"></script>
   <script>
+    document.getElementById('game-script').src += Date.now();
+  </script>
+
+  <script type="module">
+    // Dev escape hatch: disable & unregister SW with ?dev=1
+    const params = new URLSearchParams(location.search);
+    const isDev = params.get('dev') === '1';
+    const buildTag = String(Date.now());
+
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('service-worker.js').catch(err => {
-        console.error('Service Worker registration failed', err);
-      });
+      if (isDev) {
+        navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister()));
+        console.info('[SW] Unregistered for dev (use ?dev=1).');
+      } else {
+        navigator.serviceWorker.register('./service-worker.js?v=' + buildTag).then(reg => {
+          if (reg.waiting) reg.waiting.postMessage('SKIP_WAITING');
+          reg.addEventListener('updatefound', () => {
+            const sw = reg.installing;
+            if (!sw) return;
+            sw.addEventListener('statechange', () => {
+              if (sw.state === 'installed' && navigator.serviceWorker.controller) {
+                sw.postMessage('SKIP_WAITING');
+              }
+            });
+          });
+        });
+
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          location.reload();
+        });
+      }
     }
+
+    const cvs = document.getElementById('game');
+    const overlay = document.getElementById('focusOverlay');
+    window.addEventListener('load', () => cvs.focus());
+    ['pointerdown','mousedown','touchstart'].forEach(ev =>
+      cvs.addEventListener(ev, () => cvs.focus(), { passive: true })
+    );
+    cvs.addEventListener('focus', () => { overlay.style.display = 'none'; });
+    cvs.addEventListener('blur', () => { overlay.style.display = 'block'; });
+    window.addEventListener('keydown', (e) => {
+      const block = ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key) || (e.key.length === 1);
+      if (block) e.preventDefault();
+    }, { passive: false });
   </script>
 
 </body>
