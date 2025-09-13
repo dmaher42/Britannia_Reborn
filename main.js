@@ -6,8 +6,9 @@ import { CombatSystem } from './combat.js';
 import { pushBubble, pushActions, showToast, updatePartyUI, updateInventoryUI, gridLayer } from './ui.js';
 import { getSelectedText } from './selection.js';
 import { talkToNPC } from './ai.js';
-import { renderer, scene, camera } from './renderer.js';
-import { raycastTileFromScreen, setHighlightGrid, hideHighlight, updateHighlight } from './world3d.js';
+import { initRenderer, renderer, scene, camera, render } from './renderer.js';
+import { initWorld3D, updateWorld3D, raycastTileFromScreen, setHighlightGrid, hideHighlight, moveHeroToTile } from './world3d.js';
+import { initControls, updateControls } from './controls.js';
 
 const dpr = Math.min(window.devicePixelRatio||1, 2);
 const skyC = document.getElementById('sky'), sky = skyC.getContext('2d');
@@ -307,7 +308,8 @@ function loop(){
       camY += lookY*LOOK_SPEED*dt;
     }
   }
-  if(combat.active){
+  if(
+    .active){
     combat.update(dt);
   }
   const gameW = innerWidth, gameH = innerHeight;
@@ -347,36 +349,28 @@ function loop(){
 }
 requestAnimationFrame(loop);
 
-function moveHeroToTile(x, z){
-  console.log('moveHeroToTile', x, z);
+// 3D tile demo
+const { cameraRig } = initRenderer();
+const { world } = initWorld3D(8,8);
+scene.add(world);
+initControls({ width:8, depth:8, cameraRig });
+
+let last3d = performance.now();
+function loop3d(now){
+  requestAnimationFrame(loop3d);
+  const dt = (now - last3d)/1000; last3d = now;
+  updateControls(dt);
+  updateWorld3D(dt);
+  render();
 }
+requestAnimationFrame(loop3d);
 
-if (renderer && renderer.domElement){
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  document.body.appendChild(renderer.domElement);
-
-  const dom = renderer.domElement;
-  dom.addEventListener('pointermove', e => {
-    const rect = dom.getBoundingClientRect();
-    const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-    const ny = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-    const hit = raycastTileFromScreen(nx, ny, camera);
-    if(hit) setHighlightGrid(hit.gridX, hit.gridZ);
-    else hideHighlight();
-  });
-
-  dom.addEventListener('click', e => {
-    const rect = dom.getBoundingClientRect();
-    const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-    const ny = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-    const hit = raycastTileFromScreen(nx, ny, camera);
-    if(hit) moveHeroToTile(hit.gridX, hit.gridZ);
-  });
-
-  function loop3d(){
-    requestAnimationFrame(loop3d);
-    updateHighlight();
-    renderer.render(scene, camera);
-  }
-  loop3d();
-}
+renderer.domElement.addEventListener('pointermove', e=>{
+  const hit = raycastTileFromScreen(e.clientX, e.clientY, camera);
+  if(hit) setHighlightGrid(hit.gridX, hit.gridZ);
+  else hideHighlight();
+});
+renderer.domElement.addEventListener('click', e=>{
+  const hit = raycastTileFromScreen(e.clientX, e.clientY, camera);
+  if(hit) moveHeroToTile(hit.gridX, hit.gridZ);
+});
