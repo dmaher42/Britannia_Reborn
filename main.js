@@ -308,7 +308,8 @@ function loop(){
       camY += lookY*LOOK_SPEED*dt;
     }
   }
-  if(combat.active){
+  if(
+    .active){
     combat.update(dt);
   }
   const gameW = innerWidth, gameH = innerHeight;

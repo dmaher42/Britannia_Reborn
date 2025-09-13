@@ -61,7 +61,10 @@
     // Dev escape hatch: disable & unregister SW with ?dev=1
     const params = new URLSearchParams(location.search);
     const isDev = params.get('dev') === '1';
-    const buildTag = String(Date.now());
+    // Use a fixed build tag so the service worker file path doesn't change on
+    // every page load, which would trigger perpetual reloads. Bump this value
+    // when the service worker itself changes to force an update.
+    const buildTag = '1';
 
     if ('serviceWorker' in navigator) {
       if (isDev) {
