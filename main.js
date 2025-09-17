@@ -1,4 +1,12 @@
-import { drawSky, drawWorld, TERRAIN, TILE } from './world.js';
+import {
+  drawSky,
+  drawWorld,
+  TERRAIN,
+  TILE,
+  LORD_BRITISH_CASTLE_ENTRANCE,
+  LORD_BRITISH_THRONE_POS,
+  GARGOYLE_STANDING_POS
+} from './world.js';
 import { Party, CharacterClass, Character } from './party.js';
 import { Inventory } from './inventory.js';
 import { Spellbook, castFireDart } from './spells.js';
@@ -91,21 +99,8 @@ const DEBUG = false;
 let _lastDebugLog = 0;
 const LOOK_SPEED = 240; // pixels per second for camera look
 
-// Lord British's castle is centred at the world origin; keep a helper point for
-// the entrance so the Avatar can spawn just outside the throne room doors.
-const LORD_BRITISH_CASTLE_CENTER = { x: 0, y: 0 };
-const LORD_BRITISH_CASTLE_ENTRANCE = {
-  x: LORD_BRITISH_CASTLE_CENTER.x,
-  y: LORD_BRITISH_CASTLE_CENTER.y + TILE * 5
-};
-const LORD_BRITISH_THRONE_POS = {
-  x: LORD_BRITISH_CASTLE_CENTER.x,
-  y: LORD_BRITISH_CASTLE_CENTER.y - TILE * 2
-};
-const GARGOYLE_STANDING_POS = {
-  x: LORD_BRITISH_CASTLE_CENTER.x - TILE * 2.5,
-  y: LORD_BRITISH_CASTLE_CENTER.y + TILE
-};
+// Lord British's castle layout is defined in world.js so rendering and gameplay
+// stay in sync. Use the shared coordinates for spawning the party and NPCs.
 const PARTY_SPREAD_X = 28;
 const PARTY_SPREAD_Y = 8;
 
