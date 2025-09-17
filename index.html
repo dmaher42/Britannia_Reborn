@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Project: Britannia Reborn — Prototype</title>
   <link rel="stylesheet" href="style.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.162.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.162.0/examples/jsm/"
+      }
+    }
+  </script>
 </head>
 <body>
   <div id="root">
@@ -52,11 +60,89 @@
     <div class="watermark">Local ES‑Modules Prototype — AI optional via server</div>
   </div>
 
-  <script type="module" src="./main.js" id="game-script"></script>
   <script>
-    // simple cache bust during dev
-    const s = document.getElementById('game-script');
-    if (s && !/\?v=/.test(s.src)) s.src += (s.src.includes('?') ? '&' : '?') + 'v=' + Date.now();
+    (() => {
+      const root = document.getElementById('root') || document.body;
+      const showBootError = (message, error) => {
+        console.error('[Boot]', message, error);
+        const overlayId = 'boot-error-overlay';
+        let overlay = document.getElementById(overlayId);
+        if (!overlay) {
+          overlay = document.createElement('div');
+          overlay.id = overlayId;
+          overlay.style.position = 'fixed';
+          overlay.style.inset = '0';
+          overlay.style.zIndex = '2000';
+          overlay.style.background = 'rgba(5, 10, 22, 0.94)';
+          overlay.style.display = 'flex';
+          overlay.style.flexDirection = 'column';
+          overlay.style.alignItems = 'center';
+          overlay.style.justifyContent = 'center';
+          overlay.style.padding = '32px';
+          overlay.style.textAlign = 'center';
+          overlay.style.color = '#fff';
+          overlay.style.fontFamily = 'Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial';
+          overlay.style.gap = '16px';
+          (root || document.body).appendChild(overlay);
+        }
+
+        overlay.replaceChildren();
+        const title = document.createElement('h2');
+        title.textContent = 'Unable to start Britannia Reborn';
+        overlay.appendChild(title);
+
+        const messageEl = document.createElement('p');
+        messageEl.textContent = message;
+        overlay.appendChild(messageEl);
+
+        if (error) {
+          const details = document.createElement('pre');
+          details.textContent = (error && error.stack) || String(error);
+          details.style.maxWidth = '680px';
+          details.style.maxHeight = '240px';
+          details.style.overflow = 'auto';
+          details.style.margin = '0';
+          details.style.textAlign = 'left';
+          details.style.background = 'rgba(0, 0, 0, 0.45)';
+          details.style.padding = '16px';
+          details.style.borderRadius = '12px';
+          overlay.appendChild(details);
+        }
+
+        const hint = document.createElement('p');
+        hint.textContent = 'Please check your connection and reload the page. If the issue persists, see the browser console for details or try adding ?dev=1 to the URL to reset cached files.';
+        overlay.appendChild(hint);
+      };
+
+      window.__britanniaShowBootError = showBootError;
+
+      window.addEventListener('error', (event) => {
+        const target = event.target;
+        if (target && target.tagName === 'SCRIPT') {
+          showBootError(`Failed to load ${target.src || 'a required script'}.`, event.error || event.message);
+        }
+      }, true);
+
+      window.addEventListener('unhandledrejection', (event) => {
+        showBootError('A critical error occurred while starting the game.', event.reason);
+      });
+    })();
+  </script>
+
+  <script type="module" id="game-script">
+    const showBootError = window.__britanniaShowBootError || ((message, error) => console.error(message, error));
+    const moduleUrl = new URL('./main.js', import.meta.url);
+    const pageParams = new URLSearchParams(window.location.search);
+    const forcedVersion = pageParams.get('v');
+    if (forcedVersion) {
+      moduleUrl.searchParams.set('v', forcedVersion);
+    } else if (!moduleUrl.searchParams.has('v')) {
+      moduleUrl.searchParams.set('v', Date.now().toString());
+    }
+
+    import(moduleUrl.href).catch((error) => {
+      showBootError('Failed to load the game module.', error);
+    });
   </script>
 
   <script type="module">
@@ -66,7 +152,7 @@
     // Use a fixed build tag so the service worker file path doesn't change on
     // every page load, which would trigger perpetual reloads. Bump this value
     // when the service worker itself changes to force an update.
-    const buildTag = '1';
+    const buildTag = '2';
 
     if ('serviceWorker' in navigator) {
       if (isDev) {
@@ -84,6 +170,8 @@
               }
             });
           });
+        }).catch(err => {
+          console.warn('[SW] Registration failed; continuing without offline support.', err);
         });
 
         navigator.serviceWorker.addEventListener('controllerchange', () => {

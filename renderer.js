@@ -2,7 +2,15 @@ import * as THREE from 'three';
 
 export let renderer, scene, camera, cameraRig;
 
-export function initRenderer(container = document.body) {
+export function initRenderer(container = null) {
+  let target = container || document.body;
+  if (!target) {
+    target = document.getElementById('root');
+  }
+  if (!target) {
+    throw new Error('Renderer container element was not found.');
+  }
+
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -10,10 +18,18 @@ export function initRenderer(container = document.body) {
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.setPixelRatio(window.devicePixelRatio || 1);
   renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.domElement.id = 'world3d-canvas';
   renderer.domElement.style.position = 'absolute';
   renderer.domElement.style.top = '0';
   renderer.domElement.style.left = '0';
-  container.appendChild(renderer.domElement);
+  if (!renderer.domElement.isConnected) {
+    const existing = document.getElementById('world3d-canvas');
+    if (existing && existing !== renderer.domElement) {
+      existing.replaceWith(renderer.domElement);
+    } else {
+      target.appendChild(renderer.domElement);
+    }
+  }
 
   scene = new THREE.Scene();
 
