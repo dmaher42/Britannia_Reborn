@@ -77,10 +77,7 @@ export function initWorld3D(w = DEFAULT_WIDTH, d = DEFAULT_DEPTH) {
   tileMesh.instanceColor.needsUpdate = true;
   worldGroup.add(tileMesh);
 
-  const heroGeo = new THREE.SphereGeometry(0.3, 16, 16);
-  const heroMat = new THREE.MeshStandardMaterial({ color: 0xffee00 });
-  hero = new THREE.Mesh(heroGeo, heroMat);
-  hero.castShadow = true;
+  hero = new THREE.Object3D();
   hero.position.set(0.5, 0.3, 0.5);
   worldGroup.add(hero);
 
