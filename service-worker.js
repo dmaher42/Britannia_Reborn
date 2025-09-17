@@ -26,7 +26,7 @@ const isSameOrigin = (url) => {
   }
 };
 
-const canCacheResponse = (response) => response && ['basic', 'cors'].includes(response.type);
+const canCacheResponse = (response) => response && response.ok && ['basic', 'cors'].includes(response.type);
 
 async function cachePutSafe(cache, request, response) {
   if (!response || !canCacheResponse(response)) return;
@@ -61,12 +61,17 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET' || !isSameOrigin(request.url)) return;
 
-  if (request.mode === 'navigate') {
-    event.respondWith(handleNavigationRequest(request));
-    return;
-  }
-
-  event.respondWith(handleAssetRequest(request));
+  event.respondWith((async () => {
+    try {
+      if (request.mode === 'navigate') {
+        return await handleNavigationRequest(request);
+      }
+      return await handleAssetRequest(request);
+    } catch (err) {
+      console.warn('[SW] Falling back after fetch handler failure', request.url, err);
+      return respondWithFallback(request);
+    }
+  })());
 });
 
 async function handleNavigationRequest(request) {
@@ -103,11 +108,44 @@ async function handleAssetRequest(request) {
     await cachePutSafe(cache, request, response);
     return response;
   } catch (err) {
-    return new Response('', {
+    console.warn('[SW] Network request failed; attempting cache fallback', request.url, err);
+    return respondWithFallback(request);
+  }
+}
+
+async function respondWithFallback(request) {
+  let cache;
+  try {
+    cache = await caches.open(CACHE_NAME);
+  } catch (err) {
+    console.warn('[SW] Failed to open cache during fallback', err);
+  }
+
+  if (request.mode === 'navigate') {
+    if (cache) {
+      const cached = (await cache.match(request)) || (await cache.match('./index.html'));
+      if (cached) {
+        return cached;
+      }
+    }
+    return new Response('Offline', {
       status: 503,
-      statusText: 'Service Unavailable'
+      statusText: 'Offline',
+      headers: { 'Content-Type': 'text/plain' }
     });
   }
+
+  if (cache) {
+    const cached = await cache.match(request);
+    if (cached) {
+      return cached;
+    }
+  }
+
+  return new Response('', {
+    status: 503,
+    statusText: 'Service Unavailable'
+  });
 }
 
 self.addEventListener('message', (event) => {
