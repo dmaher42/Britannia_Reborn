@@ -191,12 +191,17 @@ function isRefreshCombo(e) {
 
 window.addEventListener('keydown', e => {
   console.log('Key down:', e.key);
+});
+window.addEventListener('keyup', e => {
+  console.log('Key up:', e.key);
+});
+
+window.addEventListener('keydown', e => {
   const key = normalizeKey(e.key);
   keys[key] = true;
   if (!isRefreshCombo(e)) e.preventDefault();
 });
 window.addEventListener('keyup', e => {
-  console.log('Key up:', e.key);
   const key = normalizeKey(e.key);
   keys[key] = false;
   if (!isRefreshCombo(e)) e.preventDefault();
@@ -242,32 +247,25 @@ function createFocusOverlay() {
   if (!overlay) {
     overlay = document.createElement('div');
     overlay.id = 'focusOverlay';
-    overlay.textContent = 'Click to focus game for controls';
-    if (document.body) {
-      document.body.appendChild(overlay);
-    }
-  } else {
-    overlay.textContent = 'Click to focus game for controls';
-    if (!overlay.parentElement && document.body) {
-      document.body.appendChild(overlay);
-    }
   }
-  if (overlay) {
-    Object.assign(overlay.style, {
-      position: 'absolute',
-      top: '10px',
-      left: '50%',
-      transform: 'translateX(-50%)',
-      padding: '8px 12px',
-      background: 'rgba(0,0,0,0.7)',
-      color: '#fff',
-      font: '14px sans-serif',
-      borderRadius: '6px',
-      zIndex: '20',
-      pointerEvents: 'none'
-    });
-    overlay.style.display = 'block';
+  overlay.textContent = 'Click to focus game for controls';
+  if (!overlay.parentElement && document.body) {
+    document.body.appendChild(overlay);
   }
+  Object.assign(overlay.style, {
+    position: 'absolute',
+    top: '10px',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    padding: '6px 10px',
+    background: 'rgba(0,0,0,0.7)',
+    color: '#fff',
+    font: '14px sans-serif',
+    borderRadius: '6px',
+    zIndex: '20',
+    pointerEvents: 'none'
+  });
+  overlay.style.display = 'block';
   return overlay;
 }
 
