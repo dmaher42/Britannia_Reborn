@@ -71,16 +71,6 @@ const [backC, back] = ensureCanvasAndContext('back');
 const [gameC, ctx] = ensureCanvasAndContext('game', { alpha: false }, { tabIndex: 0 });
 const [fxC, fx] = ensureCanvasAndContext('fx');
 
-window.addEventListener('load', () => {
-  const gameCanvas = document.getElementById('game');
-  if (gameCanvas) {
-    gameCanvas.focus();
-  }
-  if (typeof syncFocusOverlay === 'function') {
-    requestAnimationFrame(syncFocusOverlay);
-  }
-});
-
 function sizeCanvas(canvas, context) {
   canvas.width = innerWidth * dpr;
   canvas.height = innerHeight * dpr;
@@ -94,6 +84,10 @@ function onResize() {
   sizeCanvas(backC, back);
   sizeCanvas(gameC, ctx);
   sizeCanvas(fxC, fx);
+  if (!party.leader) {
+    debugCircle.x = innerWidth / 2;
+    debugCircle.y = innerHeight / 2;
+  }
 }
 
 addEventListener('resize', onResize);
@@ -108,6 +102,7 @@ let _bootWatchdogTimer = 0;
 const DEBUG = false;
 let _lastDebugLog = 0;
 const LOOK_SPEED = 240; // pixels per second for camera look
+const debugCircle = { x: innerWidth / 2, y: innerHeight / 2, radius: 18, speed: 180 };
 
 // Lord British's castle layout is defined in world.js so rendering and gameplay
 // stay in sync. Use the shared coordinates for spawning the party and NPCs.
@@ -166,8 +161,10 @@ const spells = new Spellbook(inventory, party);
 
 const combat = new CombatSystem(party, inventory, spells, gameC, ctx, fx, gridLayer);
 
+const focusOverlayEl = document.getElementById('focusOverlay');
+
 // Keyboard input: bind to window
-export const keys = Object.create(null);
+export const pressedKeys = new Set();
 
 function normalizeKey(k) {
   const map = {
@@ -183,30 +180,34 @@ function normalizeKey(k) {
   return k.length === 1 ? k.toLowerCase() : k;
 }
 
-// Prevent default browser behavior (e.g., page scrolling) on key events
-function isRefreshCombo(e) {
-  return e.key.startsWith('F') ||
-    (e.key.toLowerCase() === 'r' && (e.ctrlKey || e.metaKey));
+const arrowKeys = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+
+function handleKeyDown(e) {
+  console.debug('Key down:', e.key);
+  const key = normalizeKey(e.key);
+  if (arrowKeys.has(key)) {
+    e.preventDefault();
+  }
+  pressedKeys.add(key);
+  if (showKeyOverlay) updateKeyOverlay();
 }
 
-window.addEventListener('keydown', e => {
-  console.log('Key down:', e.key);
-});
-window.addEventListener('keyup', e => {
-  console.log('Key up:', e.key);
-});
+function handleKeyUp(e) {
+  console.debug('Key up:', e.key);
+  const key = normalizeKey(e.key);
+  if (arrowKeys.has(key)) {
+    e.preventDefault();
+  }
+  pressedKeys.delete(key);
+  if (showKeyOverlay) updateKeyOverlay();
+}
 
-window.addEventListener('keydown', e => {
-  const key = normalizeKey(e.key);
-  keys[key] = true;
-  if (!isRefreshCombo(e)) e.preventDefault();
+window.addEventListener('keydown', handleKeyDown, { passive: false });
+window.addEventListener('keyup', handleKeyUp, { passive: false });
+window.addEventListener('blur', () => {
+  pressedKeys.clear();
+  if (showKeyOverlay) updateKeyOverlay();
 });
-window.addEventListener('keyup', e => {
-  const key = normalizeKey(e.key);
-  keys[key] = false;
-  if (!isRefreshCombo(e)) e.preventDefault();
-});
-window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 
 // Overlay for pressed keys (toggle with '?')
 let showKeyOverlay = false;
@@ -228,7 +229,7 @@ function updateKeyOverlay() {
   }
   overlay.style.display = showKeyOverlay ? 'block' : 'none';
   if (showKeyOverlay) {
-    overlay.textContent = 'Keys: ' + Object.entries(keys).filter(([k,v])=>v).map(([k])=>k).join(', ');
+    overlay.textContent = 'Keys: ' + Array.from(pressedKeys).join(', ');
   }
 }
 window.addEventListener('keydown', e => {
@@ -242,84 +243,51 @@ setInterval(() => { if (showKeyOverlay) updateKeyOverlay(); }, 100);
 // Focus logic
 const gameCanvas = gameC;
 
-function createFocusOverlay() {
-  let overlay = document.getElementById('focusOverlay');
-  if (!overlay) {
-    overlay = document.createElement('div');
-    overlay.id = 'focusOverlay';
-  }
-  overlay.textContent = 'Click to focus game for controls';
-  if (!overlay.parentElement && document.body) {
-    document.body.appendChild(overlay);
-  }
-  Object.assign(overlay.style, {
-    position: 'absolute',
-    top: '10px',
-    left: '50%',
-    transform: 'translateX(-50%)',
-    padding: '6px 10px',
-    background: 'rgba(0,0,0,0.7)',
-    color: '#fff',
-    font: '14px sans-serif',
-    borderRadius: '6px',
-    zIndex: '20',
-    pointerEvents: 'none'
-  });
-  overlay.style.display = 'block';
-  return overlay;
-}
-
-const focusOverlay = createFocusOverlay();
-let _bootFocusApplied = false;
-
-function syncFocusOverlay() {
-  if (!focusOverlay) return;
+function updateFocusOverlayVisibility() {
+  if (!focusOverlayEl) return;
   const windowHasFocus = typeof document.hasFocus === 'function' ? document.hasFocus() : true;
   const isFocused = windowHasFocus && document.activeElement === gameCanvas;
-  focusOverlay.style.display = isFocused ? 'none' : 'block';
+  focusOverlayEl.classList.toggle('visible', !isFocused);
 }
 
-function focusGameCanvasOnce(){
-  if (_bootFocusApplied) return;
-  if (typeof document.hasFocus === 'function' && !document.hasFocus()) return;
-  if (gameCanvas) {
-    gameCanvas.focus({ preventScroll: true });
-    _bootFocusApplied = true;
-    syncFocusOverlay();
-  }
-}
-
-function handlePointerFocus(){
+function focusGameCanvas() {
   if (!gameCanvas) return;
-  if (document.activeElement !== gameCanvas) {
+  if (typeof gameCanvas.focus === 'function') {
     gameCanvas.focus({ preventScroll: true });
   }
-  requestAnimationFrame(syncFocusOverlay);
+  requestAnimationFrame(updateFocusOverlayVisibility);
 }
 
 if (gameCanvas) {
-  gameCanvas.addEventListener('pointerdown', handlePointerFocus, { passive: true });
-  gameCanvas.addEventListener('focus', syncFocusOverlay);
-  gameCanvas.addEventListener('blur', syncFocusOverlay);
+  gameCanvas.addEventListener('focus', updateFocusOverlayVisibility);
+  gameCanvas.addEventListener('blur', updateFocusOverlayVisibility);
+  gameCanvas.addEventListener('pointerdown', () => {
+    if (document.activeElement !== gameCanvas) {
+      focusGameCanvas();
+    }
+  });
 }
 
-window.addEventListener('focus', () => {
-  focusGameCanvasOnce();
-  syncFocusOverlay();
-});
-window.addEventListener('blur', syncFocusOverlay);
-document.addEventListener('visibilitychange', syncFocusOverlay);
-
-function initFocusManagement(){
-  focusGameCanvasOnce();
-  syncFocusOverlay();
+function startFocusManagement() {
+  focusGameCanvas();
+  updateFocusOverlayVisibility();
 }
 
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => requestAnimationFrame(initFocusManagement));
+  window.addEventListener('load', startFocusManagement, { once: true });
 } else {
-  requestAnimationFrame(initFocusManagement);
+  requestAnimationFrame(startFocusManagement);
 }
+
+document.addEventListener('pointerdown', () => {
+  if (document.activeElement !== gameCanvas) {
+    focusGameCanvas();
+  }
+});
+
+window.addEventListener('focus', updateFocusOverlayVisibility);
+window.addEventListener('blur', updateFocusOverlayVisibility);
+document.addEventListener('visibilitychange', updateFocusOverlayVisibility);
 
 function showBootWatchdog(){
   if (_watchdogShown) return;
@@ -450,8 +418,14 @@ function showFirstMoveHint(){
 showFirstMoveHint();
 
 function updateTerrainPill() {
-  const terr = TERRAIN.at(Math.floor(party.leader.x/TILE), Math.floor(party.leader.y/TILE));
   const pill = document.getElementById('terrainPill');
+  if (!pill) return;
+  const leader = party.leader;
+  if (!leader) {
+    pill.textContent = 'Terrain: Unknown';
+    return;
+  }
+  const terr = TERRAIN.at(Math.floor(leader.x / TILE), Math.floor(leader.y / TILE));
   pill.textContent = 'Terrain: ' + terr.name;
 }
 
@@ -468,41 +442,70 @@ function loop(){
     back.clearRect(0,0,innerWidth,innerHeight); sky.clearRect(0,0,innerWidth,innerHeight);
     drawSky(sky, back, dt, innerWidth, innerHeight);
 
-  let mvx=0,mvy=0;
-  if(keys['a'] || keys['ArrowLeft']) mvx-=1;
-  if(keys['d'] || keys['ArrowRight']) mvx+=1;
-  if(keys['w'] || keys['ArrowUp']) mvy-=1;
-  if(keys['s'] || keys['ArrowDown']) mvy+=1;
-  const looking = keys['Shift'] && (keys['ArrowLeft']||keys['ArrowRight']||keys['ArrowUp']||keys['ArrowDown']);
-  // Only move if not in enemy turn and not looking
-  if((mvx||mvy) && !looking && (!combat.active || combat.turn !== 'enemy')){
-    const len=Math.hypot(mvx,mvy)||1; mvx/=len; mvy/=len;
-    const terr = TERRAIN.at(Math.floor(party.leader.x/TILE), Math.floor(party.leader.y/TILE));
-    let s = party.leader.speed();
-    if(terr.key==='SWAMP'){ s*=0.7; if(Math.random()<0.02){ party.leader.applyPoison(1); } }
-    if(terr.key==='FOREST'){ s*=0.86; }
-    if(terr.key==='ROAD'){ s*=1.22; }
-    if(terr.key==='WATER'){ s*=0.5; }
-    if(terr.key==='SAND'){ s*=0.92; }
-    party.move(mvx*s*dt, mvy*s*dt);
-    camX = party.leader.x - innerWidth/2;
-    camY = party.leader.y - innerHeight/2;
-    updateTerrainPill();
-  } else if(!looking) {
-    camX = party.leader.x - innerWidth/2;
-    camY = party.leader.y - innerHeight/2;
+  const leader = party.leader || null;
+  const left = pressedKeys.has('a') || pressedKeys.has('ArrowLeft');
+  const right = pressedKeys.has('d') || pressedKeys.has('ArrowRight');
+  const up = pressedKeys.has('w') || pressedKeys.has('ArrowUp');
+  const down = pressedKeys.has('s') || pressedKeys.has('ArrowDown');
+  let mvx = 0;
+  let mvy = 0;
+  if (left) mvx -= 1;
+  if (right) mvx += 1;
+  if (up) mvy -= 1;
+  if (down) mvy += 1;
+  const arrowActive = pressedKeys.has('ArrowLeft') || pressedKeys.has('ArrowRight') || pressedKeys.has('ArrowUp') || pressedKeys.has('ArrowDown');
+  const looking = pressedKeys.has('Shift') && arrowActive;
+
+  if (leader && !combat.active) {
+    if ((mvx || mvy) && !looking) {
+      const len = Math.hypot(mvx, mvy) || 1;
+      mvx /= len;
+      mvy /= len;
+      const terr = TERRAIN.at(Math.floor(leader.x / TILE), Math.floor(leader.y / TILE));
+      let s = leader.speed();
+      if (terr.key === 'SWAMP') { s *= 0.7; if (Math.random() < 0.02) { leader.applyPoison(1); } }
+      if (terr.key === 'FOREST') { s *= 0.86; }
+      if (terr.key === 'ROAD') { s *= 1.22; }
+      if (terr.key === 'WATER') { s *= 0.5; }
+      if (terr.key === 'SAND') { s *= 0.92; }
+      party.move(mvx * s * dt, mvy * s * dt);
+      camX = leader.x - innerWidth / 2;
+      camY = leader.y - innerHeight / 2;
+      updateTerrainPill();
+    } else if (!looking) {
+      camX = leader.x - innerWidth / 2;
+      camY = leader.y - innerHeight / 2;
+    }
+  } else if (!leader) {
+    if (mvx || mvy) {
+      const len = Math.hypot(mvx, mvy) || 1;
+      mvx /= len;
+      mvy /= len;
+      debugCircle.x = Math.max(0, Math.min(innerWidth, debugCircle.x + mvx * debugCircle.speed * dt));
+      debugCircle.y = Math.max(0, Math.min(innerHeight, debugCircle.y + mvy * debugCircle.speed * dt));
+    }
+    if (!looking) {
+      camX = debugCircle.x - innerWidth / 2;
+      camY = debugCircle.y - innerHeight / 2;
+    }
+  } else if (!looking) {
+    camX = leader.x - innerWidth / 2;
+    camY = leader.y - innerHeight / 2;
   }
 
-  if(looking){
-    let lookX=0, lookY=0;
-    if(keys['ArrowLeft']) lookX-=1;
-    if(keys['ArrowRight']) lookX+=1;
-    if(keys['ArrowUp']) lookY-=1;
-    if(keys['ArrowDown']) lookY+=1;
-    if(lookX||lookY){
-      const len=Math.hypot(lookX,lookY)||1; lookX/=len; lookY/=len;
-      camX += lookX*LOOK_SPEED*dt;
-      camY += lookY*LOOK_SPEED*dt;
+  if (looking) {
+    let lookX = 0;
+    let lookY = 0;
+    if (pressedKeys.has('ArrowLeft')) lookX -= 1;
+    if (pressedKeys.has('ArrowRight')) lookX += 1;
+    if (pressedKeys.has('ArrowUp')) lookY -= 1;
+    if (pressedKeys.has('ArrowDown')) lookY += 1;
+    if (lookX || lookY) {
+      const len = Math.hypot(lookX, lookY) || 1;
+      lookX /= len;
+      lookY /= len;
+      camX += lookX * LOOK_SPEED * dt;
+      camY += lookY * LOOK_SPEED * dt;
     }
   }
   if (combat.active) {
@@ -512,7 +515,9 @@ function loop(){
   const view = {camX, camY, W:gameW, H:gameH};
   // Debug: draw a small red crosshair at screen center to ensure game canvas is visible
     // normal rendering
-  const terrVisPenalty = TERRAIN.at(Math.floor(party.leader.x/TILE), Math.floor(party.leader.y/TILE)).key==='FOREST' ? .08 : 0;
+  const terrVisPenalty = leader
+    ? (TERRAIN.at(Math.floor(leader.x / TILE), Math.floor(leader.y / TILE)).key === 'FOREST' ? 0.08 : 0)
+    : 0;
   drawWorld(ctx, view, dt, terrVisPenalty);
   // Draw world then party (ensure leader visible)
   try{
@@ -528,14 +533,24 @@ function loop(){
     if(!_loggedBoot){
       console.info('Render loop started', {
         partySize: party.size,
-        leaderPosition: party.leader ? {
-          x: Math.round(party.leader.x),
-          y: Math.round(party.leader.y)
+        leaderPosition: leader ? {
+          x: Math.round(leader.x),
+          y: Math.round(leader.y)
         } : null
       });
       _loggedBoot = true;
     }
-    drawHeroMarker(ctx, view, party.leader);
+    drawHeroMarker(ctx, view, leader);
+    if (!leader) {
+      const screenX = debugCircle.x - camX;
+      const screenY = debugCircle.y - camY;
+      ctx.save();
+      ctx.fillStyle = 'rgba(64, 128, 255, 0.9)';
+      ctx.beginPath();
+      ctx.arc(screenX, screenY, debugCircle.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
     uiModule.draw?.(ctx);
   }catch(err){
     console.error('party.draw failed', err);
@@ -543,7 +558,7 @@ function loop(){
   combat.draw(ctx, fx, view);
   if (DEBUG && now - _lastDebugLog > 1000) {
     console.info('Key listeners attached:', window);
-    console.info('Party size:', party.size, 'Leader coords:', party.leader.x, party.leader.y);
+    console.info('Party size:', party.size, 'Leader coords:', leader ? `${leader.x}, ${leader.y}` : 'none');
     _lastDebugLog = now;
   }
 
@@ -551,8 +566,8 @@ function loop(){
 
   // no debug overlay in production
 
-    combat.drawLighting(fx, view, party.leader);
-    } catch (err) {
+  combat.drawLighting(fx, view, leader);
+  } catch (err) {
     console.error('loop iteration failed', err);
   }
 }
