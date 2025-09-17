@@ -71,6 +71,16 @@ const [backC, back] = ensureCanvasAndContext('back');
 const [gameC, ctx] = ensureCanvasAndContext('game', { alpha: false }, { tabIndex: 0 });
 const [fxC, fx] = ensureCanvasAndContext('fx');
 
+window.addEventListener('load', () => {
+  const gameCanvas = document.getElementById('game');
+  if (gameCanvas) {
+    gameCanvas.focus();
+  }
+  if (typeof syncFocusOverlay === 'function') {
+    requestAnimationFrame(syncFocusOverlay);
+  }
+});
+
 function sizeCanvas(canvas, context) {
   canvas.width = innerWidth * dpr;
   canvas.height = innerHeight * dpr;
@@ -180,11 +190,13 @@ function isRefreshCombo(e) {
 }
 
 window.addEventListener('keydown', e => {
+  console.log('Key down:', e.key);
   const key = normalizeKey(e.key);
   keys[key] = true;
   if (!isRefreshCombo(e)) e.preventDefault();
 });
 window.addEventListener('keyup', e => {
+  console.log('Key up:', e.key);
   const key = normalizeKey(e.key);
   keys[key] = false;
   if (!isRefreshCombo(e)) e.preventDefault();
@@ -224,22 +236,58 @@ setInterval(() => { if (showKeyOverlay) updateKeyOverlay(); }, 100);
 
 // Focus logic
 const gameCanvas = gameC;
-const focusOverlay = document.getElementById('focusOverlay');
+
+function createFocusOverlay() {
+  let overlay = document.getElementById('focusOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'focusOverlay';
+    overlay.textContent = 'Click to focus game for controls';
+    if (document.body) {
+      document.body.appendChild(overlay);
+    }
+  } else {
+    overlay.textContent = 'Click to focus game for controls';
+    if (!overlay.parentElement && document.body) {
+      document.body.appendChild(overlay);
+    }
+  }
+  if (overlay) {
+    Object.assign(overlay.style, {
+      position: 'absolute',
+      top: '10px',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      padding: '8px 12px',
+      background: 'rgba(0,0,0,0.7)',
+      color: '#fff',
+      font: '14px sans-serif',
+      borderRadius: '6px',
+      zIndex: '20',
+      pointerEvents: 'none'
+    });
+    overlay.style.display = 'block';
+  }
+  return overlay;
+}
+
+const focusOverlay = createFocusOverlay();
 let _bootFocusApplied = false;
 
-function updateFocusHint(){
+function syncFocusOverlay() {
   if (!focusOverlay) return;
-  focusOverlay.textContent = 'Press the game area to focus';
-  const shouldShow = !document.hasFocus();
-  focusOverlay.style.display = shouldShow ? 'flex' : 'none';
+  const windowHasFocus = typeof document.hasFocus === 'function' ? document.hasFocus() : true;
+  const isFocused = windowHasFocus && document.activeElement === gameCanvas;
+  focusOverlay.style.display = isFocused ? 'none' : 'block';
 }
 
 function focusGameCanvasOnce(){
   if (_bootFocusApplied) return;
-  if (!document.hasFocus()) return;
+  if (typeof document.hasFocus === 'function' && !document.hasFocus()) return;
   if (gameCanvas) {
     gameCanvas.focus({ preventScroll: true });
     _bootFocusApplied = true;
+    syncFocusOverlay();
   }
 }
 
@@ -248,30 +296,25 @@ function handlePointerFocus(){
   if (document.activeElement !== gameCanvas) {
     gameCanvas.focus({ preventScroll: true });
   }
-  requestAnimationFrame(updateFocusHint);
-}
-
-if (focusOverlay) {
-  focusOverlay.style.alignItems = 'center';
-  focusOverlay.style.justifyContent = 'center';
+  requestAnimationFrame(syncFocusOverlay);
 }
 
 if (gameCanvas) {
   gameCanvas.addEventListener('pointerdown', handlePointerFocus, { passive: true });
-  gameCanvas.addEventListener('focus', updateFocusHint);
-  gameCanvas.addEventListener('blur', updateFocusHint);
+  gameCanvas.addEventListener('focus', syncFocusOverlay);
+  gameCanvas.addEventListener('blur', syncFocusOverlay);
 }
 
 window.addEventListener('focus', () => {
   focusGameCanvasOnce();
-  updateFocusHint();
+  syncFocusOverlay();
 });
-window.addEventListener('blur', updateFocusHint);
-document.addEventListener('visibilitychange', updateFocusHint);
+window.addEventListener('blur', syncFocusOverlay);
+document.addEventListener('visibilitychange', syncFocusOverlay);
 
 function initFocusManagement(){
   focusGameCanvasOnce();
-  updateFocusHint();
+  syncFocusOverlay();
 }
 
 if (document.readyState === 'loading') {
