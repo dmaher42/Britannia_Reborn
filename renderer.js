@@ -49,5 +49,3 @@ export function render() {
     renderer.render(scene, camera);
   }
 }
-
-export { renderer, scene, camera, cameraRig };
