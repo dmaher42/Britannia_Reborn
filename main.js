@@ -11,13 +11,73 @@ import { initRenderer, renderer, scene, camera, render } from './renderer.js';
 import { initWorld3D, updateWorld3D, raycastTileFromScreen, setHighlightGrid, hideHighlight, moveHeroToTile } from './world3d.js';
 import { initControls, updateControls } from './controls.js';
 
-const dpr = Math.min(window.devicePixelRatio||1, 2);
-const skyC = document.getElementById('sky'), sky = skyC.getContext('2d');
-const backC = document.getElementById('back'), back = backC.getContext('2d');
-const gameC = document.getElementById('game'), ctx = gameC.getContext('2d',{alpha:false});
-const fxC = document.getElementById('fx'), fx = fxC.getContext('2d');
-function sizeCanvas(c){ c.width = innerWidth * dpr; c.height = innerHeight * dpr; c.style.width = innerWidth+'px'; c.style.height = innerHeight+'px'; c.getContext('2d').setTransform(dpr,0,0,dpr,0,0); }
-function onResize(){ [skyC,backC,gameC,fxC].forEach(sizeCanvas); }
+const showBootError = (typeof window !== 'undefined' && window.__britanniaShowBootError)
+  ? window.__britanniaShowBootError
+  : ((message, error) => console.error('[Boot]', message, error));
+
+const rootElement = document.getElementById('root') || document.body;
+const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+function ensureCanvasElement(id, { tabIndex } = {}) {
+  let element = document.getElementById(id);
+  if (!element) {
+    element = document.createElement('canvas');
+    element.id = id;
+    if (typeof tabIndex === 'number') {
+      element.tabIndex = tabIndex;
+    }
+    const anchor = rootElement && (rootElement.querySelector('#focusOverlay') || rootElement.firstChild);
+    if (rootElement) {
+      rootElement.insertBefore(element, anchor || null);
+    } else {
+      document.body.appendChild(element);
+    }
+  } else if (!(element instanceof HTMLCanvasElement)) {
+    const err = new Error(`Element with id "${id}" is not a <canvas>.`);
+    showBootError(`Expected a <canvas> element with id "${id}".`, err);
+    throw err;
+  } else if (typeof tabIndex === 'number' && element.tabIndex !== tabIndex) {
+    element.tabIndex = tabIndex;
+  }
+  return element;
+}
+
+function ensure2dContext(canvas, options) {
+  const context = canvas.getContext('2d', options);
+  if (!context) {
+    const err = new Error(`Unable to acquire a 2D context for canvas #${canvas.id}.`);
+    showBootError('Failed to initialise the rendering surface. Your browser may not support HTML5 Canvas.', err);
+    throw err;
+  }
+  return context;
+}
+
+function ensureCanvasAndContext(id, contextOptions, extra = {}) {
+  const canvas = ensureCanvasElement(id, extra);
+  const context = ensure2dContext(canvas, contextOptions);
+  return [canvas, context];
+}
+
+const [skyC, sky] = ensureCanvasAndContext('sky');
+const [backC, back] = ensureCanvasAndContext('back');
+const [gameC, ctx] = ensureCanvasAndContext('game', { alpha: false }, { tabIndex: 0 });
+const [fxC, fx] = ensureCanvasAndContext('fx');
+
+function sizeCanvas(canvas, context) {
+  canvas.width = innerWidth * dpr;
+  canvas.height = innerHeight * dpr;
+  canvas.style.width = `${innerWidth}px`;
+  canvas.style.height = `${innerHeight}px`;
+  context.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+function onResize() {
+  sizeCanvas(skyC, sky);
+  sizeCanvas(backC, back);
+  sizeCanvas(gameC, ctx);
+  sizeCanvas(fxC, fx);
+}
+
 addEventListener('resize', onResize);
 
 let camX = -innerWidth/2, camY = -innerHeight/2;
@@ -168,7 +228,7 @@ window.addEventListener('keydown', e => {
 setInterval(() => { if (showKeyOverlay) updateKeyOverlay(); }, 100);
 
 // Focus logic
-const gameCanvas = document.getElementById('game');
+const gameCanvas = gameC;
 const focusOverlay = document.getElementById('focusOverlay');
 let _bootFocusApplied = false;
 
@@ -470,27 +530,52 @@ if (document.readyState === 'loading') {
 }
 
 // 3D tile demo
-const { cameraRig } = initRenderer();
-const { world } = initWorld3D(8,8);
-scene.add(world);
-initControls({ width:8, depth:8, cameraRig });
-
-let last3d = performance.now();
-function loop3d(now){
-  requestAnimationFrame(loop3d);
-  const dt = (now - last3d)/1000; last3d = now;
-  updateControls(dt);
-  updateWorld3D(dt);
-  render();
+let cameraRig = null;
+let rendererBoot = null;
+try {
+  rendererBoot = initRenderer();
+  cameraRig = rendererBoot.cameraRig;
+} catch (err) {
+  console.error('[3D] Failed to initialise renderer', err);
+  showToast('3D renderer unavailable — continuing without the showcase.');
 }
-requestAnimationFrame(loop3d);
 
-renderer.domElement.addEventListener('pointermove', e=>{
-  const hit = raycastTileFromScreen(e.clientX, e.clientY, camera);
-  if(hit) setHighlightGrid(hit.gridX, hit.gridZ);
-  else hideHighlight();
-});
-renderer.domElement.addEventListener('click', e=>{
-  const hit = raycastTileFromScreen(e.clientX, e.clientY, camera);
-  if(hit) moveHeroToTile(hit.gridX, hit.gridZ);
-});
+let world3D = null;
+if (cameraRig) {
+  try {
+    world3D = initWorld3D(8, 8);
+    scene.add(world3D.world);
+    initControls({ width: 8, depth: 8, cameraRig });
+  } catch (err) {
+    console.error('[3D] Failed to initialise world preview', err);
+    showToast('3D showcase failed to start. Core gameplay is still available.');
+    world3D = null;
+  }
+}
+
+if (rendererBoot && world3D) {
+  let last3d = performance.now();
+  function loop3d(now){
+    requestAnimationFrame(loop3d);
+    const dt = (now - last3d)/1000; last3d = now;
+    updateControls(dt);
+    updateWorld3D(dt);
+    render();
+  }
+  requestAnimationFrame(loop3d);
+
+  const threeCanvas = renderer && renderer.domElement;
+  if (threeCanvas) {
+    threeCanvas.addEventListener('pointermove', e=>{
+      const hit = raycastTileFromScreen(e.clientX, e.clientY, camera);
+      if(hit) setHighlightGrid(hit.gridX, hit.gridZ);
+      else hideHighlight();
+    });
+    threeCanvas.addEventListener('click', e=>{
+      const hit = raycastTileFromScreen(e.clientX, e.clientY, camera);
+      if(hit) moveHeroToTile(hit.gridX, hit.gridZ);
+    });
+  }
+} else {
+  console.info('[3D] Preview disabled; running 2D mode only.');
+}

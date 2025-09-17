@@ -62,6 +62,8 @@
 
   <script>
     (() => {
+      const BUILD_TAG = '3';
+      window.__BR_BUILD_TAG = BUILD_TAG;
       const root = document.getElementById('root') || document.body;
       const showBootError = (message, error) => {
         console.error('[Boot]', message, error);
@@ -116,6 +118,16 @@
 
       window.__britanniaShowBootError = showBootError;
 
+      const importMapSupported = typeof HTMLScriptElement === 'undefined'
+        || typeof HTMLScriptElement.supports !== 'function'
+        || HTMLScriptElement.supports('importmap');
+
+      if (!importMapSupported) {
+        showBootError('This browser does not support import maps, which are required to load the Britannia Reborn engine.', new Error('Import maps unsupported'));
+      }
+
+      window.__BR_CAN_BOOT = importMapSupported;
+
       window.addEventListener('error', (event) => {
         const target = event.target;
         if (target && target.tagName === 'SCRIPT') {
@@ -131,18 +143,25 @@
 
   <script type="module" id="game-script">
     const showBootError = window.__britanniaShowBootError || ((message, error) => console.error(message, error));
-    const moduleUrl = new URL('./main.js', import.meta.url);
-    const pageParams = new URLSearchParams(window.location.search);
-    const forcedVersion = pageParams.get('v');
-    if (forcedVersion) {
-      moduleUrl.searchParams.set('v', forcedVersion);
-    } else if (!moduleUrl.searchParams.has('v')) {
-      moduleUrl.searchParams.set('v', Date.now().toString());
-    }
+    const canBoot = window.__BR_CAN_BOOT !== false;
+    const buildTag = window.__BR_BUILD_TAG || '3';
 
-    import(moduleUrl.href).catch((error) => {
-      showBootError('Failed to load the game module.', error);
-    });
+    if (canBoot) {
+      const moduleUrl = new URL('./main.js', import.meta.url);
+      const pageParams = new URLSearchParams(window.location.search);
+      const forcedVersion = pageParams.get('v');
+      if (forcedVersion) {
+        moduleUrl.searchParams.set('v', forcedVersion);
+      } else {
+        moduleUrl.searchParams.set('v', buildTag);
+      }
+
+      import(moduleUrl.href).catch((error) => {
+        showBootError('Failed to load the game module.', error);
+      });
+    } else {
+      console.warn('Britannia Reborn boot aborted: missing browser features.');
+    }
   </script>
 
   <script type="module">
@@ -152,7 +171,7 @@
     // Use a fixed build tag so the service worker file path doesn't change on
     // every page load, which would trigger perpetual reloads. Bump this value
     // when the service worker itself changes to force an update.
-    const buildTag = '2';
+    const buildTag = window.__BR_BUILD_TAG || '3';
 
     if ('serviceWorker' in navigator) {
       if (isDev) {
