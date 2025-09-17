@@ -27,23 +27,40 @@ const DEBUG = false;
 let _lastDebugLog = 0;
 const LOOK_SPEED = 240; // pixels per second for camera look
 
+// Lord British's castle is centred at the world origin; keep a helper point for
+// the entrance so the Avatar can spawn just outside the throne room doors.
+const LORD_BRITISH_CASTLE_CENTER = { x: 0, y: 0 };
+const LORD_BRITISH_CASTLE_ENTRANCE = {
+  x: LORD_BRITISH_CASTLE_CENTER.x,
+  y: LORD_BRITISH_CASTLE_CENTER.y + TILE * 5
+};
+const LORD_BRITISH_THRONE_POS = {
+  x: LORD_BRITISH_CASTLE_CENTER.x,
+  y: LORD_BRITISH_CASTLE_CENTER.y - TILE * 2
+};
+const GARGOYLE_STANDING_POS = {
+  x: LORD_BRITISH_CASTLE_CENTER.x - TILE * 2.5,
+  y: LORD_BRITISH_CASTLE_CENTER.y + TILE
+};
+const PARTY_SPREAD_X = 28;
+const PARTY_SPREAD_Y = 8;
+
 const party = new Party([
   { name:'Avatar', cls:CharacterClass.Avatar, STR:12, DEX:10, INT:9, hpMax:30, mpClass:true },
   { name:'Iolo', cls:CharacterClass.Bard, STR:9, DEX:12, INT:8,  hpMax:22 },
   { name:'Shamino', cls:CharacterClass.Ranger, STR:11, DEX:12, INT:10, hpMax:24 }
 ]);
 
-// place party near screen center so leader is visible at boot
-function placePartyAtScreenCenter(){
-  const cx = innerWidth/2;
-  const cy = innerHeight/2;
+// Place the party near the castle gate rather than the throne room interior.
+function placePartyAt(location){
   const mid = (party.members.length - 1) / 2;
   party.members.forEach((m,i)=>{
-    m.x = cx + (i - mid) * 28; // small side-by-side offsets
-    m.y = cy + (i % 2 ? 8 : -8);
+    m.x = location.x + (i - mid) * PARTY_SPREAD_X;
+    const verticalOffset = i === 0 ? 0 : (i % 2 ? PARTY_SPREAD_Y : -PARTY_SPREAD_Y);
+    m.y = location.y + verticalOffset;
   });
 }
-placePartyAtScreenCenter();
+placePartyAt(LORD_BRITISH_CASTLE_ENTRANCE);
 
 // NPCs present at Lord British's castle
 const npcs = [
@@ -65,9 +82,8 @@ const npcs = [
   )
 ];
 function placeNPCs(){
-  const cx = innerWidth/2, cy = innerHeight/2;
-  if(npcs[0]){ npcs[0].x = cx + 80; npcs[0].y = cy - 40; }
-  if(npcs[1]){ npcs[1].x = cx - 80; npcs[1].y = cy + 40; }
+  if(npcs[0]){ npcs[0].x = LORD_BRITISH_THRONE_POS.x; npcs[0].y = LORD_BRITISH_THRONE_POS.y; }
+  if(npcs[1]){ npcs[1].x = GARGOYLE_STANDING_POS.x; npcs[1].y = GARGOYLE_STANDING_POS.y; }
 }
 placeNPCs();
 
@@ -216,6 +232,7 @@ function centerCameraOnLeader(){
   if(!party.leader) return;
   camX = party.leader.x - innerWidth/2;
   camY = party.leader.y - innerHeight/2;
+  updateTerrainPill();
   console.info('Boot: party size=', party.size, 'leader=', party.leader.name, 'coords=', Math.round(party.leader.x), Math.round(party.leader.y));
 }
 onResize();
