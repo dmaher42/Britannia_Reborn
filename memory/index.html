@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Memory Cue — Unified Tagging</title>
+  <link rel="stylesheet" href="./memory.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="app-title">
+        <h1>Memory Cue</h1>
+        <p class="app-subtitle">Unified tagging across reminders, lesson plans, and quick notes.</p>
+      </div>
+      <div class="tag-widget" id="tagPreferenceSnapshot" aria-live="polite"></div>
+    </header>
+
+    <main class="layout-grid">
+      <section class="dashboard" aria-labelledby="dashboard-heading">
+        <h2 id="dashboard-heading">Tag insights</h2>
+        <div class="dashboard-grid">
+          <article class="dashboard-card" aria-labelledby="popular-tags-heading">
+            <div class="dashboard-card-header">
+              <h3 id="popular-tags-heading">Popular tags</h3>
+            </div>
+            <div class="dashboard-card-body" id="popularTagsList"></div>
+          </article>
+
+          <article class="dashboard-card" aria-labelledby="recent-by-tag-heading">
+            <div class="dashboard-card-header">
+              <h3 id="recent-by-tag-heading">Recent items by tag</h3>
+              <label class="tag-select" for="recentTagSelect">Explore tag</label>
+            </div>
+            <div class="dashboard-card-body recent-by-tag">
+              <select id="recentTagSelect" aria-label="Choose tag to view recent items"></select>
+              <ul class="recent-items" id="recentTagItems"></ul>
+            </div>
+          </article>
+
+          <article class="dashboard-card" aria-labelledby="tag-quick-links-heading">
+            <div class="dashboard-card-header">
+              <h3 id="tag-quick-links-heading">Quick tag links</h3>
+              <p class="dashboard-card-subtitle">Jump directly to everything related to a tag.</p>
+            </div>
+            <div class="dashboard-card-body" id="tagQuickLinks"></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="feature" id="remindersSection" aria-labelledby="reminders-heading">
+        <div class="feature-header">
+          <div>
+            <h2 id="reminders-heading">Reminders</h2>
+            <p>Keep classroom follow-ups and deadlines organised.</p>
+          </div>
+          <div class="filter-region" id="remindersFilterRegion"></div>
+        </div>
+        <form id="reminderForm" class="item-form" autocomplete="off">
+          <div class="form-grid">
+            <label>
+              <span>Title</span>
+              <input type="text" name="title" required placeholder="e.g., Email parents about field trip" />
+            </label>
+            <label>
+              <span>Due date</span>
+              <input type="date" name="dueDate" />
+            </label>
+          </div>
+          <label class="full-width">
+            <span>Details</span>
+            <textarea name="details" rows="2" placeholder="Add context or action steps"></textarea>
+          </label>
+          <div class="full-width">
+            <span class="label">Tags</span>
+            <div class="tag-input-slot" id="reminderTagInput"></div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="primary">Save reminder</button>
+          </div>
+        </form>
+        <div class="active-filters" id="remindersActiveFilters" aria-live="polite"></div>
+        <div class="item-list" id="remindersList" aria-live="polite"></div>
+      </section>
+
+      <section class="feature" id="lessonsSection" aria-labelledby="lessons-heading">
+        <div class="feature-header">
+          <div>
+            <h2 id="lessons-heading">Lesson plans</h2>
+            <p>Tag upcoming lessons and key objectives for quick retrieval.</p>
+          </div>
+          <div class="filter-region" id="lessonsFilterRegion"></div>
+        </div>
+        <form id="lessonForm" class="item-form" autocomplete="off">
+          <div class="form-grid">
+            <label>
+              <span>Lesson title</span>
+              <input type="text" name="title" required placeholder="e.g., Fractions lab" />
+            </label>
+            <label>
+              <span>Grade level</span>
+              <input type="text" name="grade" placeholder="e.g., Grade 3" />
+            </label>
+          </div>
+          <label class="full-width">
+            <span>Overview</span>
+            <textarea name="overview" rows="2" placeholder="Key objectives or materials"></textarea>
+          </label>
+          <div class="full-width">
+            <span class="label">Tags</span>
+            <div class="tag-input-slot" id="lessonTagInput"></div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="primary">Save lesson plan</button>
+          </div>
+        </form>
+        <div class="active-filters" id="lessonsActiveFilters" aria-live="polite"></div>
+        <div class="item-list" id="lessonsList" aria-live="polite"></div>
+      </section>
+
+      <section class="feature" id="notesSection" aria-labelledby="notes-heading">
+        <div class="feature-header">
+          <div>
+            <h2 id="notes-heading">Quick notes</h2>
+            <p>Capture on-the-fly ideas, student wins, or follow-ups.</p>
+          </div>
+          <div class="filter-region" id="notesFilterRegion"></div>
+        </div>
+        <form id="noteForm" class="item-form" autocomplete="off">
+          <label class="full-width">
+            <span>Title</span>
+            <input type="text" name="title" required placeholder="e.g., Parent meeting recap" />
+          </label>
+          <label class="full-width">
+            <span>Note</span>
+            <textarea name="content" rows="3" placeholder="Details you want to remember"></textarea>
+          </label>
+          <div class="full-width">
+            <span class="label">Tags</span>
+            <div class="tag-input-slot" id="noteTagInput"></div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="primary">Save note</button>
+          </div>
+        </form>
+        <div class="active-filters" id="notesActiveFilters" aria-live="polite"></div>
+        <div class="item-list" id="notesList" aria-live="polite"></div>
+      </section>
+    </main>
+  </div>
+
+  <template id="emptyStateTemplate">
+    <div class="empty-state">
+      <p class="empty-title"></p>
+      <p class="empty-subtitle"></p>
+    </div>
+  </template>
+
+  <script type="module" src="./memory.js"></script>
+</body>
+</html>
