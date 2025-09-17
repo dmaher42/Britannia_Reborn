@@ -52,9 +52,11 @@
     <div class="watermark">Local ES‑Modules Prototype — AI optional via server</div>
   </div>
 
-  <script type="module" src="./main.js?v=" id="game-script"></script>
+  <script type="module" src="./main.js" id="game-script"></script>
   <script>
-    document.getElementById('game-script').src += Date.now();
+    // simple cache bust during dev
+    const s = document.getElementById('game-script');
+    if (s && !/\?v=/.test(s.src)) s.src += (s.src.includes('?') ? '&' : '?') + 'v=' + Date.now();
   </script>
 
   <script type="module">
@@ -90,18 +92,6 @@
       }
     }
 
-    const cvs = document.getElementById('game');
-    const overlay = document.getElementById('focusOverlay');
-    window.addEventListener('load', () => cvs.focus());
-    ['pointerdown','mousedown','touchstart'].forEach(ev =>
-      cvs.addEventListener(ev, () => cvs.focus(), { passive: true })
-    );
-    cvs.addEventListener('focus', () => { overlay.style.display = 'none'; });
-    cvs.addEventListener('blur', () => { overlay.style.display = 'block'; });
-    window.addEventListener('keydown', (e) => {
-      const block = ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key) || (e.key.length === 1);
-      if (block) e.preventDefault();
-    }, { passive: false });
   </script>
 
 </body>

@@ -4,6 +4,7 @@ import { Inventory } from './inventory.js';
 import { Spellbook, castFireDart } from './spells.js';
 import { CombatSystem } from './combat.js';
 import { pushBubble, pushActions, showToast, updatePartyUI, updateInventoryUI, gridLayer } from './ui.js';
+import * as uiModule from './ui.js';
 import { getSelectedText } from './selection.js';
 import { talkToNPC } from './ai.js';
 import { initRenderer, renderer, scene, camera, render } from './renderer.js';
@@ -23,6 +24,9 @@ let camX = -innerWidth/2, camY = -innerHeight/2;
 let heroMarkerVisible = true;
 let firstMoveMade = false;
 let _loggedBoot = false;
+let _firstPartyDrawAt = 0;
+let _watchdogShown = false;
+let _bootWatchdogTimer = 0;
 const DEBUG = false;
 let _lastDebugLog = 0;
 const LOOK_SPEED = 240; // pixels per second for camera look
@@ -166,29 +170,102 @@ setInterval(() => { if (showKeyOverlay) updateKeyOverlay(); }, 100);
 // Focus logic
 const gameCanvas = document.getElementById('game');
 const focusOverlay = document.getElementById('focusOverlay');
-function showFocusOverlay() {
-  focusOverlay.style.display = 'block';
-  focusOverlay.textContent = 'Click to refocus · WASD/Arrows to move · Shift+Arrows to look';
+let _bootFocusApplied = false;
+
+function updateFocusHint(){
+  if (!focusOverlay) return;
+  focusOverlay.textContent = 'Press the game area to focus';
+  const shouldShow = !document.hasFocus();
+  focusOverlay.style.display = shouldShow ? 'flex' : 'none';
 }
-function hideFocusOverlay() {
-  focusOverlay.style.display = 'none';
-}
-function checkFocus() {
-  if (!document.hasFocus() || document.activeElement !== gameCanvas) {
-    showFocusOverlay();
-  } else {
-    hideFocusOverlay();
+
+function focusGameCanvasOnce(){
+  if (_bootFocusApplied) return;
+  if (!document.hasFocus()) return;
+  if (gameCanvas) {
+    gameCanvas.focus({ preventScroll: true });
+    _bootFocusApplied = true;
   }
 }
-gameCanvas.addEventListener('mousedown', () => { gameCanvas.focus(); });
-gameCanvas.addEventListener('touchstart', () => { gameCanvas.focus(); });
-window.addEventListener('focus', checkFocus);
-window.addEventListener('blur', checkFocus);
-document.addEventListener('DOMContentLoaded', () => {
-  gameCanvas.focus();
-  checkFocus();
+
+function handlePointerFocus(){
+  if (!gameCanvas) return;
+  if (document.activeElement !== gameCanvas) {
+    gameCanvas.focus({ preventScroll: true });
+  }
+  requestAnimationFrame(updateFocusHint);
+}
+
+if (focusOverlay) {
+  focusOverlay.style.alignItems = 'center';
+  focusOverlay.style.justifyContent = 'center';
+}
+
+if (gameCanvas) {
+  gameCanvas.addEventListener('pointerdown', handlePointerFocus, { passive: true });
+  gameCanvas.addEventListener('focus', updateFocusHint);
+  gameCanvas.addEventListener('blur', updateFocusHint);
+}
+
+window.addEventListener('focus', () => {
+  focusGameCanvasOnce();
+  updateFocusHint();
 });
-setTimeout(checkFocus, 500);
+window.addEventListener('blur', updateFocusHint);
+document.addEventListener('visibilitychange', updateFocusHint);
+
+function initFocusManagement(){
+  focusGameCanvasOnce();
+  updateFocusHint();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => requestAnimationFrame(initFocusManagement));
+} else {
+  requestAnimationFrame(initFocusManagement);
+}
+
+function showBootWatchdog(){
+  if (_watchdogShown) return;
+  _watchdogShown = true;
+  const toast = document.createElement('div');
+  toast.innerHTML = `Starting renderer… If the screen is blank/blue:<br>• Click the game area to focus<br>• Try ?dev=1 to bypass service worker<br>• Check DevTools console for import errors`;
+  toast.style.position = 'fixed';
+  toast.style.top = '16px';
+  toast.style.left = '50%';
+  toast.style.transform = 'translateX(-50%)';
+  toast.style.zIndex = '10000';
+  toast.style.background = 'rgba(20,24,32,0.9)';
+  toast.style.color = '#fff';
+  toast.style.padding = '12px 18px';
+  toast.style.borderRadius = '10px';
+  toast.style.boxShadow = '0 12px 32px rgba(0,0,0,0.35)';
+  toast.style.font = '14px/1.4 sans-serif';
+  toast.style.maxWidth = 'min(420px, 92vw)';
+  toast.style.textAlign = 'left';
+  toast.style.opacity = '0';
+  toast.style.transition = 'opacity 320ms ease';
+  document.body.appendChild(toast);
+  requestAnimationFrame(() => { toast.style.opacity = '1'; });
+  setTimeout(() => {
+    toast.style.transition = 'opacity 700ms ease';
+    toast.style.opacity = '0';
+    setTimeout(() => toast.remove(), 720);
+  }, 7000);
+}
+
+function scheduleBootWatchdog(){
+  if (_bootWatchdogTimer) return;
+  requestAnimationFrame(() => {
+    if (_bootWatchdogTimer) return;
+    _bootWatchdogTimer = window.setTimeout(() => {
+      if (_firstPartyDrawAt === 0) {
+        showBootWatchdog();
+      }
+      _bootWatchdogTimer = 0;
+    }, 2000);
+  });
+}
 
 document.getElementById('btnTalk').onclick = async () => {
   const player = party.leader;
@@ -244,13 +321,20 @@ centerCameraOnLeader();
 // Hero Marker drawing helper
 function drawHeroMarker(ctx, view, leader){
   if(!heroMarkerVisible || !leader) return;
-  const {camX, camY} = view;
+  const { camX, camY } = view;
   const sx = leader.x - camX, sy = leader.y - camY;
   ctx.save();
-  ctx.strokeStyle = '#8fd3ff'; ctx.lineWidth = 3; ctx.globalAlpha = 0.95;
-  ctx.beginPath(); ctx.ellipse(sx, sy+6, 22, 8, 0, 0, Math.PI*2); ctx.stroke();
-  ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(sx-28, sy-36, 56, 18);
-  ctx.fillStyle = '#bfeaff'; ctx.font = '12px sans-serif'; ctx.textAlign='center'; ctx.fillText(leader.name || 'Avatar', sx, sy-24);
+  ctx.beginPath();
+  ctx.ellipse(sx, sy+6, 22, 8, 0, 0, Math.PI*2);
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = '#ffffff';
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+  ctx.fillRect(sx-28, sy-36, 56, 18);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '12px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(leader.name || 'Avatar', sx, sy-24);
   ctx.restore();
 }
 
@@ -336,16 +420,29 @@ function loop(){
   drawWorld(ctx, view, dt, terrVisPenalty);
   // Draw world then party (ensure leader visible)
   try{
+    npcs.forEach(n=>n.draw(ctx, view));
+    party.draw(ctx, view);
+    if (_firstPartyDrawAt === 0) {
+      _firstPartyDrawAt = performance.now();
+      if (_bootWatchdogTimer) {
+        clearTimeout(_bootWatchdogTimer);
+        _bootWatchdogTimer = 0;
+      }
+    }
     if(!_loggedBoot){
-      console.info('Render loop starting. party.size=', party.size, 'leader=', party.leader && {x:Math.round(party.leader.x), y:Math.round(party.leader.y)} );
+      console.info('Render loop started', {
+        partySize: party.size,
+        leaderPosition: party.leader ? {
+          x: Math.round(party.leader.x),
+          y: Math.round(party.leader.y)
+        } : null
+      });
       _loggedBoot = true;
     }
-  npcs.forEach(n=>n.draw(ctx, view));
-  party.draw(ctx, view);
-  // Draw Hero Marker and nameplate after party
-  drawHeroMarker(ctx, view, party.leader);
+    drawHeroMarker(ctx, view, party.leader);
+    uiModule.draw?.(ctx);
   }catch(err){
-    console.error('party.draw failed', err && err.stack ? err.stack : err);
+    console.error('party.draw failed', err);
   }
   combat.draw(ctx, fx, view);
   if (DEBUG && now - _lastDebugLog > 1000) {
@@ -364,6 +461,13 @@ function loop(){
   }
 }
 requestAnimationFrame(loop);
+
+const bootWatchdogStarter = () => scheduleBootWatchdog();
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', bootWatchdogStarter, { once: true });
+} else {
+  bootWatchdogStarter();
+}
 
 // 3D tile demo
 const { cameraRig } = initRenderer();
