@@ -62,15 +62,32 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET' || !isSameOrigin(request.url)) return;
 
   event.respondWith((async () => {
+    let response;
     try {
       if (request.mode === 'navigate') {
-        return await handleNavigationRequest(request);
+        response = await handleNavigationRequest(request);
+      } else {
+        response = await handleAssetRequest(request);
       }
-      return await handleAssetRequest(request);
     } catch (err) {
       console.warn('[SW] Falling back after fetch handler failure', request.url, err);
-      return respondWithFallback(request);
+      try {
+        response = await respondWithFallback(request);
+      } catch (fallbackError) {
+        console.error('[SW] Fallback handler failed', request.url, fallbackError);
+      }
     }
+
+    if (!(response instanceof Response)) {
+      console.error('[SW] Fetch handler returned a non-Response value; serving error response instead', request.url, response);
+      return new Response('Service worker error', {
+        status: 503,
+        statusText: 'Service Worker Error',
+        headers: { 'Content-Type': 'text/plain' }
+      });
+    }
+
+    return response;
   })());
 });
 
