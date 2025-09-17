@@ -12,13 +12,20 @@ const ASSETS = [
   './ui.js',
   './ai.js',
   './selection.js',
-  './style.css'
+  './style.css',
+  './renderer.js',
+  './world3d.js',
+  './controls.js'
 ];
 
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE_NAME);
-    await cache.addAll(ASSETS.map(u => new Request(u, { cache: 'reload' })));
+    try {
+      await cache.addAll(ASSETS.map(u => new Request(u, { cache: 'reload' })));
+    } catch (err) {
+      console.warn('[SW] Failed to precache some assets', err);
+    }
     await self.skipWaiting();
   })());
 });
@@ -46,12 +53,20 @@ self.addEventListener('fetch', (event) => {
       try {
         const fresh = await fetch(request, { cache: 'no-store' });
         const cache = await caches.open(CACHE_NAME);
-        cache.put(request, fresh.clone());
+        try {
+          await cache.put(request, fresh.clone());
+        } catch (err) {
+          console.warn('[SW] Failed to update cache for', request.url, err);
+        }
         return fresh;
       } catch {
         const cache = await caches.open(CACHE_NAME);
         const cached = await cache.match(request);
-        return cached || new Response('Offline', { status: 503 });
+        return cached || new Response('Offline', {
+          status: 503,
+          statusText: 'Offline',
+          headers: { 'Content-Type': 'text/plain' }
+        });
       }
     })());
     return;
@@ -63,10 +78,17 @@ self.addEventListener('fetch', (event) => {
     if (cached) return cached;
     try {
       const fresh = await fetch(request);
-      cache.put(request, fresh.clone());
+      try {
+        await cache.put(request, fresh.clone());
+      } catch (err) {
+        console.warn('[SW] Failed to cache', request.url, err);
+      }
       return fresh;
     } catch {
-      return cached || Response.error();
+      return cached || new Response('', {
+        status: 503,
+        statusText: 'Service Unavailable'
+      });
     }
   })());
 });
