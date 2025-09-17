@@ -1,4 +1,8 @@
 // Three.js stub for testing without external dependencies
+// This file provides minimal Three.js API stubs to allow the game to load
+// when the external Three.js CDN is blocked by ad blockers or security settings.
+// The core 2D game functionality works without Three.js, which is only used for 3D features.
+
 export class WebGLRenderer {
   constructor(options) {
     this.domElement = document.createElement('canvas');
