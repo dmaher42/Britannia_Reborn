@@ -1,17 +1,22 @@
 import * as THREE from 'three';
 
-export let renderer, scene, camera, cameraRig;
+let renderer;
+let scene;
+let camera;
+let cameraRig;
+
+function resolveContainer(container) {
+  if (container) return container;
+  const root = document.getElementById('root');
+  if (root) return root;
+  if (document.body) return document.body;
+  throw new Error('Renderer container element was not found.');
+}
 
 export function initRenderer(container = null) {
-  let target = container || document.body;
-  if (!target) {
-    target = document.getElementById('root');
-  }
-  if (!target) {
-    throw new Error('Renderer container element was not found.');
-  }
+  const target = resolveContainer(container);
 
-  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.shadowMap.enabled = true;
@@ -22,16 +27,20 @@ export function initRenderer(container = null) {
   renderer.domElement.style.position = 'absolute';
   renderer.domElement.style.top = '0';
   renderer.domElement.style.left = '0';
-  if (!renderer.domElement.isConnected) {
-    const existing = document.getElementById('world3d-canvas');
-    if (existing && existing !== renderer.domElement) {
-      existing.replaceWith(renderer.domElement);
-    } else {
-      target.appendChild(renderer.domElement);
-    }
+  renderer.domElement.style.zIndex = '0';
+  renderer.setClearColor(0x000000, 0);
+
+  const existing = document.getElementById('world3d-canvas');
+  if (existing && existing !== renderer.domElement) {
+    existing.replaceWith(renderer.domElement);
+  } else if (renderer.domElement.parentElement !== target) {
+    renderer.domElement.remove();
   }
 
+  target.insertBefore(renderer.domElement, target.firstChild || null);
+
   scene = new THREE.Scene();
+  scene.background = null;
 
   cameraRig = new THREE.Group();
   camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -65,3 +74,5 @@ export function render() {
     renderer.render(scene, camera);
   }
 }
+
+export { renderer, scene, camera, cameraRig };

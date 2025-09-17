@@ -6,6 +6,7 @@
 html,body{height:100%;margin:0;background:radial-gradient(1200px 800px at 70% -10%, #0e1c33 0%, #0b1326 45%, var(--bg) 100% );color:var(--text);font-family:Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial}
 #root{height:100%}
 canvas{display:block;position:absolute;inset:0}
+#game,#hud,#ui{position:absolute;z-index:10;top:0;left:0}
 #focusOverlay{display:none;position:absolute;left:0;top:0;width:100vw;height:100vh;z-index:1000;pointer-events:none;text-align:center;font:16px sans-serif;color:#fff;background:rgba(0,0,0,.25)}
 .vignette{position:absolute;inset:0;pointer-events:none;background:
   radial-gradient(1200px 800px at 50% 30%, #0000 0%, #0000 55%, rgba(0,0,0,.28) 85%, rgba(0,0,0,.6) 100%)}
