@@ -28,6 +28,7 @@ export function initRenderer(container = null) {
   renderer.domElement.style.top = '0';
   renderer.domElement.style.left = '0';
   renderer.domElement.style.zIndex = '0';
+  renderer.domElement.style.pointerEvents = 'none';
   renderer.setClearColor(0x000000, 0);
 
   const existing = document.getElementById('world3d-canvas');
