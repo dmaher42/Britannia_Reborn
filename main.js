@@ -3,7 +3,7 @@ import {
   drawWorld,
   TERRAIN,
   TILE,
-  LORD_BRITISH_CASTLE_ENTRANCE,
+  LORD_BRITISH_CASTLE_SWAMP_EDGE,
   LORD_BRITISH_THRONE_POS,
   GARGOYLE_STANDING_POS
 } from './world.js';
@@ -115,7 +115,7 @@ const party = new Party([
   { name:'Shamino', cls:CharacterClass.Ranger, STR:11, DEX:12, INT:10, hpMax:24 }
 ]);
 
-// Place the party near the castle gate rather than the throne room interior.
+// Place the party in the swamp just outside the castle walls.
 function placePartyAt(location){
   const mid = (party.members.length - 1) / 2;
   party.members.forEach((m,i)=>{
@@ -124,7 +124,7 @@ function placePartyAt(location){
     m.y = location.y + verticalOffset;
   });
 }
-placePartyAt(LORD_BRITISH_CASTLE_ENTRANCE);
+placePartyAt(LORD_BRITISH_CASTLE_SWAMP_EDGE);
 
 // NPCs present at Lord British's castle
 const npcs = [
