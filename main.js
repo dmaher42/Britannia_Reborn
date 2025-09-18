@@ -34,6 +34,30 @@ window.addEventListener('unhandledrejection', (ev)=>{
   }catch(_){/* ignore */}
   // leave other rejections alone so they surface normally
 });
+
+// Also catch global runtime errors coming from the editor preview wrapper
+// (frame.bundle.js). Those are external to the app; suppress the known
+// 'selectedText' noise and keep other errors visible.
+window.addEventListener('error', (e)=>{
+  try{
+    const src = e && (e.filename || (e.error && e.error.fileName));
+    const msg = e && (e.message || (e.error && e.error.message));
+    if(src && src.includes('frame.bundle.js')){
+      // suppress this external wrapper's errors
+      console.warn('Suppressed preview wrapper error from', src, ':', msg);
+      e.preventDefault && e.preventDefault();
+      return true;
+    }
+    // Heuristic: some errors reference selectedText in the message
+    if(msg && typeof msg === 'string' && msg.includes('selectedText')){
+      console.warn('Suppressed selectedText error (likely preview wrapper):', msg);
+      e.preventDefault && e.preventDefault();
+      return true;
+    }
+  }catch(_){/* ignore */}
+  // otherwise let the error bubble through
+  return false;
+});
 function sizeCanvas(c){ c.width = innerWidth * dpr; c.height = innerHeight * dpr; c.style.width = innerWidth+'px'; c.style.height = innerHeight+'px'; c.getContext('2d').setTransform(dpr,0,0,dpr,0,0); }
 function onResize(){ [skyC,backC,gameC,fxC].forEach(sizeCanvas); }
 addEventListener('resize', onResize); onResize();
