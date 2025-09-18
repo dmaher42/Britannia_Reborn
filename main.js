@@ -46,6 +46,24 @@ function placePartyAtScreenCenter(){
 }
 placePartyAtScreenCenter();
 
+// small on-screen debug panel (shows coords & canvas sizes) to help verify
+// the game is running and where the camera/leader are. Visible in prod for
+// now until we confirm visuals.
+const _debugPanel = document.createElement('div');
+_debugPanel.id = 'debugPanel';
+_debugPanel.style.position = 'fixed';
+_debugPanel.style.right = '12px';
+_debugPanel.style.top = '72px';
+_debugPanel.style.padding = '8px 10px';
+_debugPanel.style.background = 'rgba(0,0,0,0.6)';
+_debugPanel.style.color = '#9fe8ff';
+_debugPanel.style.border = '1px solid rgba(80,140,180,0.12)';
+_debugPanel.style.borderRadius = '8px';
+_debugPanel.style.zIndex = 99999;
+_debugPanel.style.fontSize = '12px';
+_debugPanel.style.lineHeight = '1.4';
+document.body.appendChild(_debugPanel);
+
 const inventory = new Inventory();
 inventory.gold = 125;
 inventory.add({ id:'sulfur_ash', name:'Sulfur Ash', weight:0.1, qty:3, tag:'reagent' });
@@ -190,3 +208,10 @@ function loop(){
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
+
+// Update debug panel regularly (in case user opens outside devtools)
+setInterval(()=>{
+  if(!_debugPanel) return;
+  const leader = party && party.leader ? `${Math.round(party.leader.x)},${Math.round(party.leader.y)}` : 'none';
+  _debugPanel.innerHTML = `cam: ${Math.round(camX)},${Math.round(camY)}<br>leader: ${leader}<br>canvas: ${innerWidth}×${innerHeight}`;
+}, 250);
