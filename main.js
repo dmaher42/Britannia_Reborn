@@ -3,6 +3,7 @@ import {
   drawWorld,
   TERRAIN,
   TILE,
+  LORD_BRITISH_CASTLE_BOUNDS,
   LORD_BRITISH_CASTLE_SWAMP_EDGE,
   LORD_BRITISH_THRONE_POS,
   GARGOYLE_STANDING_POS
@@ -151,6 +152,96 @@ function placeNPCs(){
 }
 placeNPCs();
 
+// --- Spawn safety: ensure leader spawns on-map and camera recenters ---
+const SPAWN_MARGIN = 16;
+const FALLBACK_PADDING = TILE * 8;
+
+const fallbackBounds = {
+  left: LORD_BRITISH_CASTLE_BOUNDS.left - FALLBACK_PADDING,
+  right: LORD_BRITISH_CASTLE_BOUNDS.right + FALLBACK_PADDING,
+  top: LORD_BRITISH_CASTLE_BOUNDS.top - FALLBACK_PADDING,
+  bottom: LORD_BRITISH_CASTLE_BOUNDS.bottom + FALLBACK_PADDING
+};
+
+function getInitialMapBounds() {
+  const globalBounds = typeof window !== 'undefined' ? window.mapBounds : undefined;
+  if (globalBounds && ['left', 'right', 'top', 'bottom'].every((k) => Number.isFinite(globalBounds[k]))) {
+    return globalBounds;
+  }
+  if (typeof mapWidthPx === 'number' && typeof mapHeightPx === 'number') {
+    return { left: 0, top: 0, right: mapWidthPx, bottom: mapHeightPx };
+  }
+  return fallbackBounds;
+}
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+function clampToMap(px, py, bounds = getInitialMapBounds()) {
+  const left = Math.min(bounds.left, bounds.right);
+  const right = Math.max(bounds.left, bounds.right);
+  const top = Math.min(bounds.top, bounds.bottom);
+  const bottom = Math.max(bounds.top, bounds.bottom);
+  const minX = left + SPAWN_MARGIN;
+  const maxX = right - SPAWN_MARGIN;
+  const minY = top + SPAWN_MARGIN;
+  const maxY = bottom - SPAWN_MARGIN;
+  const safeX = minX <= maxX ? clamp(px, minX, maxX) : (left + right) / 2;
+  const safeY = minY <= maxY ? clamp(py, minY, maxY) : (top + bottom) / 2;
+  return { x: safeX, y: safeY };
+}
+
+// 1) Ensure a leader exists so downstream code has a reference
+if (!party.leader && Array.isArray(party.members) && party.members.length > 0) {
+  party.leader = party.members[0];
+  console.warn('[spawn] No leader set; defaulted to first party member');
+}
+
+// 2) Clamp boot position if the leader is off-map and recenter camera
+if (party.leader) {
+  const bounds = getInitialMapBounds();
+  const left = Math.min(bounds.left, bounds.right) + SPAWN_MARGIN;
+  const right = Math.max(bounds.left, bounds.right) - SPAWN_MARGIN;
+  const top = Math.min(bounds.top, bounds.bottom) + SPAWN_MARGIN;
+  const bottom = Math.max(bounds.top, bounds.bottom) - SPAWN_MARGIN;
+  const leaderX = party.leader.x;
+  const leaderY = party.leader.y;
+  const originX = Number.isFinite(leaderX) ? leaderX : (bounds.left + bounds.right) / 2;
+  const originY = Number.isFinite(leaderY) ? leaderY : (bounds.top + bounds.bottom) / 2;
+  const invalid = !Number.isFinite(leaderX) || !Number.isFinite(leaderY);
+  const xOut = left <= right ? (originX < left || originX > right) : false;
+  const yOut = top <= bottom ? (originY < top || originY > bottom) : false;
+  if (invalid || xOut || yOut) {
+    const fixed = clampToMap(originX, originY, bounds);
+    const dx = fixed.x - originX;
+    const dy = fixed.y - originY;
+    console.warn('[spawn] Leader off-map at boot:', { x: leaderX, y: leaderY }, '→', fixed);
+    if (dx || dy) {
+      party.members.forEach((member) => {
+        if (!member) return;
+        const mx = Number.isFinite(member.x) ? member.x : originX;
+        const my = Number.isFinite(member.y) ? member.y : originY;
+        member.x = mx + dx;
+        member.y = my + dy;
+      });
+    } else {
+      party.leader.x = fixed.x;
+      party.leader.y = fixed.y;
+    }
+    // Keep leader aligned even if dx/dy === 0 (e.g., NaN inputs)
+    party.leader.x = fixed.x;
+    party.leader.y = fixed.y;
+    if (typeof centerCameraOnLeader === 'function') {
+      centerCameraOnLeader();
+    }
+  }
+}
+
+// --- Dev ergonomics: expose party + camera helper for console debugging ---
+if (typeof window !== 'undefined') {
+  window.party = party;
+  window.centerCameraOnLeader = centerCameraOnLeader;
+}
+
 const inventory = new Inventory();
 inventory.gold = 125;
 inventory.add({ id:'sulfur_ash', name:'Sulfur Ash', weight:0.1, qty:3, tag:'reagent' });
@@ -167,6 +258,9 @@ const focusOverlayEl = document.getElementById('focusOverlay');
 
 // Keyboard input: bind to window
 export const pressedKeys = new Set();
+if (typeof window !== 'undefined') {
+  window.pressedKeys = pressedKeys;
+}
 
 function normalizeKey(k) {
   const map = {
@@ -241,6 +335,40 @@ window.addEventListener('keydown', e => {
   }
 });
 setInterval(() => { if (showKeyOverlay) updateKeyOverlay(); }, 100);
+
+// --- Dev hotkeys: quick recovery when testing builds ---
+window.addEventListener('keydown', (e) => {
+  if ((e.key === 'm' || e.key === 'M') && party?.leader) {
+    const leader = party.leader;
+    const cx = Number.isFinite(camX) ? camX : 0;
+    const cy = Number.isFinite(camY) ? camY : 0;
+    const targetX = cx + innerWidth / 2;
+    const targetY = cy + innerHeight / 2;
+    const dx = targetX - leader.x;
+    const dy = targetY - leader.y;
+    if (dx || dy) {
+      party.members.forEach((member) => {
+        if (!member) return;
+        member.x += dx;
+        member.y += dy;
+      });
+    }
+    if (typeof centerCameraOnLeader === 'function') {
+      centerCameraOnLeader();
+    }
+    console.info('[dev] M: warped leader to camera center');
+  }
+  if (e.key === 'r' || e.key === 'R') {
+    if (typeof pressedKeys?.clear === 'function') {
+      pressedKeys.clear();
+      if (showKeyOverlay) updateKeyOverlay();
+    }
+    if (typeof centerCameraOnLeader === 'function') {
+      centerCameraOnLeader();
+    }
+    console.info('[dev] R: cleared input & recentered');
+  }
+});
 
 // Focus logic
 const gameCanvas = gameC;
