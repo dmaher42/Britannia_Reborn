@@ -19,6 +19,21 @@ try{
   ctx.save(); ctx.fillStyle='rgba(0,255,0,0.18)'; ctx.fillRect(12,60,80,40); ctx.restore();
   fx.save(); fx.fillStyle='rgba(255,255,0,0.12)'; fx.fillRect(20,120,40,40); fx.restore();
 }catch(e){ console.warn('boot diag draw failed', e); }
+// The editor preview sometimes injects a wrapper script (frame.bundle.js)
+// which can throw an unhandled promise rejection referencing `selectedText`.
+// That's external to this app; swallow that specific error to avoid noisy
+// console output while keeping other errors visible.
+window.addEventListener('unhandledrejection', (ev)=>{
+  try{
+    const r = ev && ev.reason;
+    if(r && typeof r.message === 'string' && r.message.includes('selectedText')){
+      ev.preventDefault();
+      console.warn('Suppressed preview wrapper unhandled rejection:', r && r.message);
+      return;
+    }
+  }catch(_){/* ignore */}
+  // leave other rejections alone so they surface normally
+});
 function sizeCanvas(c){ c.width = innerWidth * dpr; c.height = innerHeight * dpr; c.style.width = innerWidth+'px'; c.style.height = innerHeight+'px'; c.getContext('2d').setTransform(dpr,0,0,dpr,0,0); }
 function onResize(){ [skyC,backC,gameC,fxC].forEach(sizeCanvas); }
 addEventListener('resize', onResize); onResize();
