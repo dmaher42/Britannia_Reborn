@@ -159,6 +159,8 @@ inventory.add({ id:'healing_potion', name:'Potion of Healing', weight:0.2, qty:1
 
 const spells = new Spellbook(inventory, party);
 
+const COMBAT_ENABLED = false;
+
 const combat = new CombatSystem(party, inventory, spells, gameC, ctx, fx, gridLayer);
 
 const focusOverlayEl = document.getElementById('focusOverlay');
@@ -273,10 +275,12 @@ function startFocusManagement() {
   updateFocusOverlayVisibility();
 }
 
+const scheduleInitialFocus = () => requestAnimationFrame(startFocusManagement);
+
 if (document.readyState === 'loading') {
-  window.addEventListener('load', startFocusManagement, { once: true });
+  document.addEventListener('DOMContentLoaded', scheduleInitialFocus, { once: true });
 } else {
-  requestAnimationFrame(startFocusManagement);
+  scheduleInitialFocus();
 }
 
 document.addEventListener('pointerdown', () => {
@@ -351,14 +355,35 @@ document.getElementById('btnTalk').onclick = async () => {
   const { text } = await talkToNPC(npc, worldState, playerState, questState, playerInput);
   pushBubble(closest.name, text);
 };
-document.getElementById('btnCombat').onclick = ()=>combat.startSkirmish();
-document.getElementById('btnCast').onclick = ()=>{
-  if(combat.active && combat.turn !== 'player') return showToast('Wait for your turn');
-  const caster = party.members[0];
-  if(!spells.canCast('fire_dart', caster)) return showToast('Need Sulfur Ash + Black Pearl and MP');
-  castFireDart(caster, combat, ctx, fx, inventory, spells);
-};
-document.getElementById('btnEndTurn').onclick = ()=> combat.endPlayerTurn();
+
+const btnCombat = document.getElementById('btnCombat');
+const btnCast = document.getElementById('btnCast');
+const btnEndTurn = document.getElementById('btnEndTurn');
+
+if (COMBAT_ENABLED) {
+  btnCombat.onclick = () => combat.startSkirmish();
+  btnCast.onclick = () => {
+    if (combat.active && combat.turn !== 'player') return showToast('Wait for your turn');
+    const caster = party.members[0];
+    if (!spells.canCast('fire_dart', caster)) return showToast('Need Sulfur Ash + Black Pearl and MP');
+    castFireDart(caster, combat, ctx, fx, inventory, spells);
+  };
+  btnEndTurn.onclick = () => combat.endPlayerTurn();
+} else {
+  if (btnCombat) {
+    btnCombat.disabled = true;
+    btnCombat.textContent = 'Combat Disabled';
+    btnCombat.title = 'Combat encounters are disabled in this build.';
+  }
+  if (btnCast) {
+    btnCast.disabled = true;
+    btnCast.title = 'Combat encounters are disabled in this build.';
+  }
+  if (btnEndTurn) {
+    btnEndTurn.disabled = true;
+    btnEndTurn.title = 'Combat encounters are disabled in this build.';
+  }
+}
 document.getElementById('btnAddLoot').onclick = ()=>{
   inventory.add({ id:'spider_silk', name:'Spider Silk', weight:0.4, qty:5, tag:'loot' });
   inventory.add({ id:'chain_mail', name:'Chain Mail', weight:6.0, qty:1, tag:'armor', equip:'torso', restricted:['Mage','Druid'] });
@@ -508,7 +533,7 @@ function loop(){
       camY += lookY * LOOK_SPEED * dt;
     }
   }
-  if (combat.active) {
+  if (COMBAT_ENABLED && combat.active) {
     combat.update(dt);
   }
   const gameW = innerWidth, gameH = innerHeight;
@@ -555,7 +580,9 @@ function loop(){
   }catch(err){
     console.error('party.draw failed', err);
   }
-  combat.draw(ctx, fx, view);
+  if (COMBAT_ENABLED) {
+    combat.draw(ctx, fx, view);
+  }
   if (DEBUG && now - _lastDebugLog > 1000) {
     console.info('Key listeners attached:', window);
     console.info('Party size:', party.size, 'Leader coords:', leader ? `${leader.x}, ${leader.y}` : 'none');
@@ -566,7 +593,9 @@ function loop(){
 
   // no debug overlay in production
 
-  combat.drawLighting(fx, view, leader);
+  if (COMBAT_ENABLED) {
+    combat.drawLighting(fx, view, leader);
+  }
   } catch (err) {
     console.error('loop iteration failed', err);
   }
