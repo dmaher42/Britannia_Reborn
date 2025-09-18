@@ -227,6 +227,12 @@ function loop(){
   // Debug: draw a small red crosshair at screen center to ensure game canvas is visible
     // normal rendering
   const terrVisPenalty = TERRAIN.at(Math.floor(party.leader.x/TILE), Math.floor(party.leader.y/TILE)).key==='FOREST' ? .08 : 0;
+  // ensure the game canvas has a neutral dark base so characters and world
+  // elements don't vanish when tiles are very dark
+  ctx.save();
+  const g = ctx.createLinearGradient(0,0,0,gameH);
+  g.addColorStop(0, '#0c1624'); g.addColorStop(1, '#07121a');
+  ctx.fillStyle = g; ctx.fillRect(0,0,gameW,gameH); ctx.restore();
   drawWorld(ctx, view, dt, terrVisPenalty);
   // Temporary visual aid: draw a bright marker at leader screen position so we
   // can confirm characters render even on very dark terrain. Remove when not
