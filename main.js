@@ -11,8 +11,16 @@ const skyC = document.getElementById('sky'), sky = skyC.getContext('2d');
 const backC = document.getElementById('back'), back = backC.getContext('2d');
 const gameC = document.getElementById('game'), ctx = gameC.getContext('2d',{alpha:false});
 const fxC = document.getElementById('fx'), fx = fxC.getContext('2d');
+// Quick boot diagnostics: log sizes and paint small test rectangles so we can
+// confirm the file loaded and each canvas is visible in the browser.
+console.info('main.js loaded', {dpr, w: innerWidth, h: innerHeight});
+try{
+  sky.save(); sky.fillStyle='magenta'; sky.fillRect(8,8,80,40); sky.restore();
+  ctx.save(); ctx.fillStyle='rgba(0,255,0,0.18)'; ctx.fillRect(12,60,80,40); ctx.restore();
+  fx.save(); fx.fillStyle='rgba(255,255,0,0.12)'; fx.fillRect(20,120,40,40); fx.restore();
+}catch(e){ console.warn('boot diag draw failed', e); }
 function sizeCanvas(c){ c.width = innerWidth * dpr; c.height = innerHeight * dpr; c.style.width = innerWidth+'px'; c.style.height = innerHeight+'px'; c.getContext('2d').setTransform(dpr,0,0,dpr,0,0); }
-function onResize(){ [skyC,backC,gameC,fxC].forEach(sizeCanvas); centerCameraOnLeader(); }
+function onResize(){ [skyC,backC,gameC,fxC].forEach(sizeCanvas); if(typeof party !== 'undefined' && party && party.leader) centerCameraOnLeader(); }
 addEventListener('resize', onResize); onResize();
 
 let camX = -innerWidth/2, camY = -innerHeight/2;
