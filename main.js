@@ -20,7 +20,7 @@ try{
   fx.save(); fx.fillStyle='rgba(255,255,0,0.12)'; fx.fillRect(20,120,40,40); fx.restore();
 }catch(e){ console.warn('boot diag draw failed', e); }
 function sizeCanvas(c){ c.width = innerWidth * dpr; c.height = innerHeight * dpr; c.style.width = innerWidth+'px'; c.style.height = innerHeight+'px'; c.getContext('2d').setTransform(dpr,0,0,dpr,0,0); }
-function onResize(){ [skyC,backC,gameC,fxC].forEach(sizeCanvas); if(typeof party !== 'undefined' && party && party.leader) centerCameraOnLeader(); }
+function onResize(){ [skyC,backC,gameC,fxC].forEach(sizeCanvas); }
 addEventListener('resize', onResize); onResize();
 
 let camX = -innerWidth/2, camY = -innerHeight/2;
@@ -45,6 +45,9 @@ function placePartyAtScreenCenter(){
   });
 }
 placePartyAtScreenCenter();
+
+// center camera now that party exists and canvases have been sized
+centerCameraOnLeader();
 
 // small on-screen debug panel (shows coords & canvas sizes) to help verify
 // the game is running and where the camera/leader are. Visible in prod for
