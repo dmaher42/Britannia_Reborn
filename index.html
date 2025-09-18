@@ -148,23 +148,26 @@
     const buildTag = window.__BR_BUILD_TAG || '3';
     const canBoot = window.__BR_CAN_BOOT !== false;
 
+    const loadGameModule = () => {
+      const moduleUrl = new URL('./main.js', import.meta.url);
+      const pageParams = new URLSearchParams(window.location.search);
+      const forcedVersion = pageParams.get('v');
+      if (forcedVersion) {
+        moduleUrl.searchParams.set('v', forcedVersion);
+      } else {
+        moduleUrl.searchParams.set('v', buildTag);
+      }
+
+      import(moduleUrl.href).catch((error) => {
+        showBootError('Failed to load the game module.', error);
+      });
+    };
+
     if (!canBoot) {
       console.warn('Britannia Reborn boot aborted: missing browser features.');
-      return;
-    }
-
-    const moduleUrl = new URL('./main.js', import.meta.url);
-    const pageParams = new URLSearchParams(window.location.search);
-    const forcedVersion = pageParams.get('v');
-    if (forcedVersion) {
-      moduleUrl.searchParams.set('v', forcedVersion);
     } else {
-      moduleUrl.searchParams.set('v', buildTag);
+      loadGameModule();
     }
-
-    import(moduleUrl.href).catch((error) => {
-      showBootError('Failed to load the game module.', error);
-    });
   </script>
 
   <script type="module">
