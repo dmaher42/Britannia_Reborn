@@ -79,9 +79,28 @@ export class Character {
     // Optionally: penalize movement if overweight
   }
   draw(ctx, view, palette={base:'#f0e0c8',hair:'#d9b36c',armor:'#2c3f57',trim:'#9ec3ff',cloak:'#17324f',blade:'#cfd8e6',boot:'#203041'}, hood=false){
+    // nudge palette for visibility on dark tiles
+    const visPalette = Object.assign({}, palette, {
+      base: palette.base || '#f2e6cf',
+      hair: palette.hair || '#e0c87a',
+      armor: palette.armor || '#344a5b',
+      cloak: palette.cloak || '#1f3a55'
+    });
+    palette = visPalette;
     const {camX, camY}=view;
     const sx = this.x - camX, sy = this.y - camY;
     const bob = Math.sin(this.step*0.22)*1.6;
+    // subtle halo to separate character from dark ground
+    try{
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const haloGrad = ctx.createRadialGradient(sx, sy-6, 4, sx, sy-6, 36);
+      haloGrad.addColorStop(0, 'rgba(140,200,255,0.18)');
+      haloGrad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = haloGrad;
+      ctx.beginPath(); ctx.arc(sx, sy-6, 36, 0, Math.PI*2); ctx.fill();
+      ctx.restore();
+    }catch(e){/* ignore halo failures */}
     ctx.save();
     ctx.globalAlpha=.4; ctx.fillStyle='#000';
     ctx.beginPath(); ctx.ellipse(sx, sy+12, 16, 8, 0, 0, Math.PI*2); ctx.fill();

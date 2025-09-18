@@ -111,5 +111,13 @@ export function drawWorld(ctx, view, dt, forestDim=0){
     ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
     ctx.globalAlpha = 1;
   }
+  // subtle ambient lighten to avoid completely black tiles; keeps contrast
+  // low so the overall mood remains dark but characters/FX pop better.
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.fillStyle = 'rgba(255,255,255,0.02)';
+  ctx.fillRect(0,0,W,H);
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.restore();
 }
 export const TILE = 36;
