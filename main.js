@@ -16,7 +16,7 @@ import * as uiModule from './ui.js';
 import { getSelectedText } from './selection.js';
 import { talkToNPC } from './ai.js';
 import { initRenderer, renderer, scene, camera, render } from './renderer.js';
-import { initWorld3D, updateWorld3D, raycastTileFromScreen, setHighlightGrid, hideHighlight, moveHeroToTile } from './world3d.js';
+import { initWorld3D, updateWorld3D, raycastTileFromScreen, setHighlightGrid, hideHighlight, moveHeroToTile, attachCameraRig } from './world3d.js';
 import { initControls, updateControls } from './controls.js';
 
 const showBootError = (typeof window !== 'undefined' && window.__britanniaShowBootError)
@@ -615,6 +615,7 @@ let rendererBoot = null;
 try {
   rendererBoot = initRenderer();
   cameraRig = rendererBoot.cameraRig;
+  attachCameraRig(cameraRig);
 } catch (err) {
   console.error('[3D] Failed to initialise renderer', err);
   showToast('3D renderer unavailable — continuing without the showcase.');
