@@ -186,6 +186,20 @@ function loop(){
     // normal rendering
   const terrVisPenalty = TERRAIN.at(Math.floor(party.leader.x/TILE), Math.floor(party.leader.y/TILE)).key==='FOREST' ? .08 : 0;
   drawWorld(ctx, view, dt, terrVisPenalty);
+  // Temporary visual aid: draw a bright marker at leader screen position so we
+  // can confirm characters render even on very dark terrain. Remove when not
+  // needed.
+  try{
+    if(party && party.leader){
+      const sx = Math.round(party.leader.x - camX);
+      const sy = Math.round(party.leader.y - camY);
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = 'rgba(255,0,255,0.85)'; ctx.beginPath(); ctx.arc(sx, sy, 10, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 2; ctx.strokeRect(sx-18, sy-18, 36, 36);
+      ctx.restore();
+    }
+  }catch(e){ console.warn('leader highlight failed', e); }
   // Draw world then party (ensure leader visible)
   try{
     if(!_loggedBoot){
