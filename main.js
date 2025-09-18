@@ -144,6 +144,9 @@ centerCameraOnLeader();
 // Ensure party members have sensible world coordinates (place near screen center)
 // Keep party positions as initialized by Party constructor; no forced repositioning here.
 
+// Update the terrain pill once at startup so the UI shows the current terrain
+try{ updateTerrainPill(); }catch(e){ /* UI may not be ready yet; ignore */ }
+
 // Hero Marker drawing helper
 function drawHeroMarker(ctx, view, leader){
   if(!heroMarkerVisible || !leader) return;
@@ -241,10 +244,3 @@ function loop(){
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
-
-// Update debug panel regularly (in case user opens outside devtools)
-setInterval(()=>{
-  if(!_debugPanel) return;
-  const leader = party && party.leader ? `${Math.round(party.leader.x)},${Math.round(party.leader.y)}` : 'none';
-  _debugPanel.innerHTML = `cam: ${Math.round(camX)},${Math.round(camY)}<br>leader: ${leader}<br>canvas: ${innerWidth}×${innerHeight}`;
-}, 250);
