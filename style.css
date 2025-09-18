@@ -5,10 +5,25 @@
 }
 html,body{height:100%;margin:0;background:radial-gradient(1200px 800px at 70% -10%, #0e1c33 0%, #0b1326 45%, var(--bg) 100% );color:var(--text);font-family:Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial}
 #root{height:100%}
+.canvas-layer{position:absolute;inset:0}
 canvas{display:block;position:absolute;inset:0}
+<<<<<<< HEAD
 #game,#hud,#ui{position:absolute;z-index:10;top:0;left:0}
 #focusOverlay{position:absolute;top:32px;left:50%;transform:translateX(-50%);padding:8px 16px;border-radius:12px;background:rgba(7,12,22,0.85);color:#fff;font-size:14px;display:none;pointer-events:none;z-index:20;white-space:nowrap;box-shadow:0 12px 32px rgba(0,0,0,0.35)}
 #focusOverlay.visible{display:block}
+=======
+/* Explicit stacking order to ensure HUD and overlays appear above canvases */
+#sky{z-index:0}
+#back{z-index:1}
+#game{z-index:2}
+#fx{z-index:3}
+.gridOverlay{z-index:4}
+.vignette{z-index:5}
+.hud{z-index:10}
+.dialogue{z-index:20}
+.toast{z-index:21}
+.watermark{z-index:30}
+>>>>>>> ci/add-vitest-workflow
 .vignette{position:absolute;inset:0;pointer-events:none;background:
   radial-gradient(1200px 800px at 50% 30%, #0000 0%, #0000 55%, rgba(0,0,0,.28) 85%, rgba(0,0,0,.6) 100%)}
 .hud{position:absolute;inset:0;pointer-events:none}

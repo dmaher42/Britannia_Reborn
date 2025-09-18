@@ -14,7 +14,7 @@
   </script>
 </head>
 <body>
-  <div id="root">
+  <div id="root" tabindex="0">
     <canvas id="sky"></canvas>
     <canvas id="back"></canvas>
     <canvas id="game" tabindex="0"></canvas>
@@ -31,10 +31,13 @@
           <button class="btn" id="btnCast">Cast: Fire Dart</button>
           <button class="btn" id="btnEndTurn" disabled>End Turn</button>
         </div>
-          <div class="right">
-            <div class="pill" id="terrainPill">Terrain: Road</div>
-          </div>
+        <div class="right">
+          <div class="pill" id="terrainPill">Terrain: Road</div>
+          <label class="pill" style="display:flex;gap:8px;align-items:center;padding-right:12px">
+            <input type="checkbox" id="bloom" style="accent-color:#52c8ff"> Bloom
+          </label>
         </div>
+      </div>
 
       <div class="panel">
         <div class="card glow" id="partyCard">
@@ -143,7 +146,7 @@
   <script type="module" id="game-script">
     const showBootError = window.__britanniaShowBootError || ((message, error) => console.error(message, error));
     const canBoot = window.__BR_CAN_BOOT !== false;
-    const buildTag = window.__BR_BUILD_TAG || '3';
+  // buildTag is provided by the boot script above via __BR_BUILD_TAG
 
     if (canBoot) {
       const moduleUrl = new URL('./main.js', import.meta.url);
