@@ -94,8 +94,15 @@ const spells = new Spellbook(inventory, party);
 const combat = new CombatSystem(party, inventory, spells, gameC, ctx, fx, gridLayer);
 
 const keys={};
-addEventListener('keydown', e=>keys[e.key]=true);
-addEventListener('keyup', e=>keys[e.key]=false);
+// prevent default scrolling for arrow keys and capture input reliably
+addEventListener('keydown', e=>{
+  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
+  keys[e.key]=true;
+});
+addEventListener('keyup', e=>{ keys[e.key]=false; });
+
+// ensure the root container receives keyboard focus so it captures WASD/Arrows
+window.addEventListener('load', ()=>{ const r=document.getElementById('root'); r && r.focus(); });
 
 document.getElementById('btnTalk').onclick = async () => {
   const npc = { name:'Britain Guard', profession:'Guard', town:'Britain', personality:'formal, dutiful' };
