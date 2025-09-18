@@ -11,14 +11,7 @@ const skyC = document.getElementById('sky'), sky = skyC.getContext('2d');
 const backC = document.getElementById('back'), back = backC.getContext('2d');
 const gameC = document.getElementById('game'), ctx = gameC.getContext('2d',{alpha:false});
 const fxC = document.getElementById('fx'), fx = fxC.getContext('2d');
-// Quick boot diagnostics: log sizes and paint small test rectangles so we can
-// confirm the file loaded and each canvas is visible in the browser.
 console.info('main.js loaded', {dpr, w: innerWidth, h: innerHeight});
-try{
-  sky.save(); sky.fillStyle='magenta'; sky.fillRect(8,8,80,40); sky.restore();
-  ctx.save(); ctx.fillStyle='rgba(0,255,0,0.18)'; ctx.fillRect(12,60,80,40); ctx.restore();
-  fx.save(); fx.fillStyle='rgba(255,255,0,0.12)'; fx.fillRect(20,120,40,40); fx.restore();
-}catch(e){ console.warn('boot diag draw failed', e); }
 // The editor preview sometimes injects a wrapper script (frame.bundle.js)
 // which can throw an unhandled promise rejection referencing `selectedText`.
 // That's external to this app; swallow that specific error to avoid noisy
@@ -88,23 +81,7 @@ placePartyAtScreenCenter();
 // center camera now that party exists and canvases have been sized
 centerCameraOnLeader();
 
-// small on-screen debug panel (shows coords & canvas sizes) to help verify
-// the game is running and where the camera/leader are. Visible in prod for
-// now until we confirm visuals.
-const _debugPanel = document.createElement('div');
-_debugPanel.id = 'debugPanel';
-_debugPanel.style.position = 'fixed';
-_debugPanel.style.right = '12px';
-_debugPanel.style.top = '72px';
-_debugPanel.style.padding = '8px 10px';
-_debugPanel.style.background = 'rgba(0,0,0,0.6)';
-_debugPanel.style.color = '#9fe8ff';
-_debugPanel.style.border = '1px solid rgba(80,140,180,0.12)';
-_debugPanel.style.borderRadius = '8px';
-_debugPanel.style.zIndex = 99999;
-_debugPanel.style.fontSize = '12px';
-_debugPanel.style.lineHeight = '1.4';
-document.body.appendChild(_debugPanel);
+// debug panel removed
 
 const inventory = new Inventory();
 inventory.gold = 125;
@@ -234,20 +211,7 @@ function loop(){
   g.addColorStop(0, '#0c1624'); g.addColorStop(1, '#07121a');
   ctx.fillStyle = g; ctx.fillRect(0,0,gameW,gameH); ctx.restore();
   drawWorld(ctx, view, dt, terrVisPenalty);
-  // Temporary visual aid: draw a bright marker at leader screen position so we
-  // can confirm characters render even on very dark terrain. Remove when not
-  // needed.
-  try{
-    if(party && party.leader){
-      const sx = Math.round(party.leader.x - camX);
-      const sy = Math.round(party.leader.y - camY);
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.fillStyle = 'rgba(255,0,255,0.85)'; ctx.beginPath(); ctx.arc(sx, sy, 10, 0, Math.PI*2); ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 2; ctx.strokeRect(sx-18, sy-18, 36, 36);
-      ctx.restore();
-    }
-  }catch(e){ console.warn('leader highlight failed', e); }
+  // leader highlight removed (debugging only)
   // Draw world then party (ensure leader visible)
   try{
     if(!_loggedBoot){

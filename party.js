@@ -94,11 +94,11 @@ export class Character {
     try{
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
-  const haloGrad = ctx.createRadialGradient(sx, sy-6, 4, sx, sy-6, 22);
-  haloGrad.addColorStop(0, 'rgba(140,200,255,0.12)');
-  haloGrad.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = haloGrad;
-  ctx.beginPath(); ctx.arc(sx, sy-6, 22, 0, Math.PI*2); ctx.fill();
+      const haloGrad = ctx.createRadialGradient(sx, sy-6, 4, sx, sy-6, 18);
+      haloGrad.addColorStop(0, 'rgba(140,200,255,0.08)');
+      haloGrad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = haloGrad;
+      ctx.beginPath(); ctx.arc(sx, sy-6, 18, 0, Math.PI*2); ctx.fill();
       ctx.restore();
     }catch(e){/* ignore halo failures */}
     ctx.save();
