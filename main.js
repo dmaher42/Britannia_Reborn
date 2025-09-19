@@ -46,6 +46,102 @@ const spellbook = new Spellbook(inventory, party);
 const combat = new CombatSystem(party);
 const input = new InputController(window);
 
+function getActiveCharacter() {
+  return party.leader ?? null;
+}
+
+function handleEquipItem(itemId) {
+  const actor = getActiveCharacter();
+  if (!actor) {
+    ui.showToast('No party member is ready to equip that item.');
+    ui.log('No one steps forward to claim the gear.');
+    return;
+  }
+
+  const item = inventory.items.find((entry) => entry.id === itemId);
+  if (!item) {
+    ui.showToast('That item is not in the party inventory.');
+    ui.log(`${actor.name} searches the packs but finds nothing matching that description.`);
+    return;
+  }
+
+  if (!item.equip) {
+    ui.showToast(`${item.name} cannot be equipped.`);
+    ui.log(`${actor.name} examines the ${item.name}, but it cannot be worn.`);
+    return;
+  }
+
+  if (Array.isArray(item.restricted) && item.restricted.length > 0 && !item.restricted.includes(actor.cls)) {
+    const allowed = item.restricted.join(', ');
+    ui.showToast(`${item.name} is restricted to ${allowed}.`);
+    ui.log(`${actor.name} cannot equip the ${item.name}. Allowed classes: ${allowed}.`);
+    return;
+  }
+
+  const previous = actor.equipment[item.equip];
+  if (!actor.equip(item)) {
+    ui.showToast(`${actor.name} cannot equip the ${item.name}; it would overburden them.`);
+    ui.log(`${actor.name} struggles with the ${item.name}, but lacks the strength to wear it.`);
+    return;
+  }
+
+  const removed = inventory.remove(item.id, 1);
+  if (!removed) {
+    actor.equipment[item.equip] = previous ? { ...previous } : null;
+    ui.showToast(`The ${item.name} slips back into the pack.`);
+    ui.log(`The party fumbles for the ${item.name}, but it remains in storage.`);
+    return;
+  }
+
+  if (previous) {
+    const previousQty = typeof previous.qty === 'number' ? previous.qty : 1;
+    inventory.add({ ...previous, qty: previousQty });
+  }
+
+  const itemName = item.name ?? item.id;
+  ui.log(`${actor.name} equips the ${itemName}.`);
+  if (previous) {
+    ui.log(`The ${previous.name ?? previous.id} is returned to the party inventory.`);
+  }
+  ui.showToast(`${actor.name} equips ${itemName}.`);
+  ui.refreshParty();
+  ui.refreshInventory();
+}
+
+function handleUseItem(itemId) {
+  const actor = getActiveCharacter();
+  if (!actor) {
+    ui.showToast('No party member is ready to use that item.');
+    ui.log('The party hesitates, unsure who should use the item.');
+    return;
+  }
+
+  const item = inventory.items.find((entry) => entry.id === itemId);
+  if (!item) {
+    ui.showToast('That item is not in the party inventory.');
+    ui.log(`${actor.name} cannot find the requested item among the supplies.`);
+    return;
+  }
+
+  if (item.tag !== 'consumable') {
+    ui.showToast(`${item.name} cannot be used right now.`);
+    ui.log(`${actor.name} cannot find a use for the ${item.name}.`);
+    return;
+  }
+
+  const itemName = item.name ?? item.id;
+  if (!inventory.consume(item.id, 1)) {
+    ui.showToast(`The party has no ${itemName} left to use.`);
+    ui.log(`${actor.name} searches the packs for ${itemName}, but finds none.`);
+    return;
+  }
+
+  ui.log(`${actor.name} uses ${itemName}.`);
+  ui.showToast(`${itemName} consumed.`);
+  ui.refreshParty();
+  ui.refreshInventory();
+}
+
 const ui = setupUI({
   party,
   inventory,
@@ -84,7 +180,9 @@ const ui = setupUI({
     ui.refreshInventory();
     ui.refreshParty();
     ui.showToast('New supplies have been stowed.');
-  }
+  },
+  onEquipItem: handleEquipItem,
+  onUseItem: handleUseItem
 });
 
 ui.log('The Avatar steps into the expanded courtyard of Castle Britannia, its new wings bustling with life.');
