@@ -8,6 +8,7 @@ import { setupUI } from './ui.js';
 import { clamp } from './utils.js';
 import { drawCharacterModel } from './character-models.js';
 import { initTooltips } from './public/ui/tooltip.js';
+import * as Fx from './public/fx/Fx.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -247,6 +248,11 @@ ui.showToast('Castle Britannia opens new wings to explore. Select a destination 
 const camera = { x: 0, y: 0, width: 0, height: 0, deadzone: { width: 320, height: 220 } };
 const deviceRatio = Math.min(window.devicePixelRatio || 1, 2);
 
+Fx.init({
+  getCamera: () => ({ x: camera.x, y: camera.y, width: camera.width, height: camera.height }),
+  worldToScreen: ({ x, y }) => ({ sx: Math.round(x - camera.x), sy: Math.round(y - camera.y) })
+});
+
 function resizeMinimap() {
   if (!minimapCanvas || !minimapCtx) return;
   const rect = minimapCanvas.getBoundingClientRect();
@@ -395,6 +401,7 @@ function update(dt) {
   const direction = inCombat ? { x: 0, y: 0 } : input.getDirection();
   party.update(dt, world, direction);
   combat.update(dt);
+  Fx.update(dt);
   updateCamera();
 
   const leader = party.leader;
@@ -422,6 +429,8 @@ function drawParty(ctx, party, cam) {
   party.members.forEach((member, index) => {
     const sx = member.x - cam.x;
     const sy = member.y - cam.y;
+    const entityId = member.id ?? `party-${index}`;
+    Fx.registerEntityBounds(entityId, { x: member.x, y: member.y, radius, shape: 'circle', space: 'world' });
     drawCharacterModel(ctx, member, {
       x: sx,
       y: sy,
@@ -562,8 +571,15 @@ function drawMinimap(world, party, cam) {
 
 function render() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  drawWorld(ctx, world, camera);
-  drawParty(ctx, party, camera);
+  const shake = Fx.getShakeOffset();
+  const cameraView = {
+    ...camera,
+    x: camera.x + shake.x,
+    y: camera.y + shake.y
+  };
+  drawWorld(ctx, world, cameraView);
+  drawParty(ctx, party, cameraView);
+  Fx.draw(ctx);
   drawMinimap(world, party, camera);
 }
 

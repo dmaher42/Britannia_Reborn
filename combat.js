@@ -1,4 +1,5 @@
 import { clamp } from './utils.js';
+import * as Fx from './public/fx/Fx.js';
 
 const DEFAULT_ENCOUNTER = [
   { id: 'brigand', name: 'Brigand', hp: 18, hpMax: 18, atk: 6, initiative: 12 },
@@ -29,6 +30,7 @@ export class CombatSystem {
     this._listeners = new Set();
     this._enemyTimer = 0;
     this._pendingEnemyActions = [];
+    this._enemyAnchors = new Map();
     this._enemyDelay = Number.isFinite(options.enemyDelay) ? Math.max(0, options.enemyDelay) : DEFAULT_ENEMY_DELAY;
     this._rng = typeof options.rng === 'function' ? options.rng : Math.random;
     this._spellbook = options.spellbook ?? null;
@@ -104,6 +106,7 @@ export class CombatSystem {
     this.round = 1;
     this._enemyTimer = 0;
     this._pendingEnemyActions = [];
+    this._seedEnemyAnchors();
     this._emit('log', 'Hostile creatures emerge from the brush!');
     this._emit('state', this.getState());
     this._emit('turn', { turn: 'player' });
@@ -236,6 +239,7 @@ export class CombatSystem {
     this.turn = 'player';
     this._enemyTimer = 0;
     this._pendingEnemyActions = [];
+    this._clearEnemyAnchors();
     const rewards = victory ? this._calculateRewards() : { xp: 0, gold: 0 };
     const summary = {
       victory,
@@ -347,13 +351,17 @@ export class CombatSystem {
   _applyEnemyDamage(enemy, amount) {
     const before = enemy.hp;
     enemy.hp = clamp(enemy.hp - amount, 0, enemy.hpMax);
-    return Math.max(0, before - enemy.hp);
+    const actual = Math.max(0, before - enemy.hp);
+    this._fxEnemyHit(enemy, actual);
+    return actual;
   }
 
   _applyPartyDamage(member, amount) {
     const before = member.hp ?? 0;
     member.hp = clamp(before - amount, 0, member.hpMax ?? before);
-    return Math.max(0, before - member.hp);
+    const actual = Math.max(0, before - member.hp);
+    this._fxPartyHit(member, actual);
+    return actual;
   }
 
   _computePhysicalDamage(attacker) {
@@ -374,6 +382,99 @@ export class CombatSystem {
   _computeEnemyDamage(enemy) {
     const atk = Number.isFinite(enemy?.atk) ? enemy.atk : 4;
     return Math.max(1, Math.round(atk));
+  }
+
+  _seedEnemyAnchors() {
+    this._clearEnemyAnchors();
+    if (!Array.isArray(this.enemies) || this.enemies.length === 0) return;
+    const members = Array.isArray(this.party?.members) ? this.party.members : [];
+    const leader = this.party?.leader ?? members.find((member) => (member?.hp ?? 0) > 0) ?? members[0] ?? null;
+    const baseX = Number.isFinite(leader?.x) ? leader.x : 0;
+    const baseY = Number.isFinite(leader?.y) ? leader.y : 0;
+    const spacingX = 56;
+    const spacingY = 44;
+    this.enemies.forEach((enemy, index) => {
+      if (!enemy?.id) return;
+      const column = Math.floor(index / 2);
+      const row = index % 2;
+      const x = baseX + 96 + column * spacingX;
+      const y = baseY - 28 + (row - 0.5) * spacingY;
+      const anchor = { x, y };
+      this._enemyAnchors.set(enemy.id, anchor);
+      Fx.registerEntityBounds(enemy.id, { x, y, radius: 20, shape: 'circle', space: 'world' });
+    });
+  }
+
+  _clearEnemyAnchors() {
+    if (!this._enemyAnchors) return;
+    for (const id of this._enemyAnchors.keys()) {
+      Fx.registerEntityBounds(id, null);
+    }
+    this._enemyAnchors.clear();
+  }
+
+  _getEnemyAnchor(enemy) {
+    if (!enemy) return { x: 0, y: 0 };
+    const cached = this._enemyAnchors.get(enemy.id);
+    if (cached) return cached;
+    const members = Array.isArray(this.party?.members) ? this.party.members : [];
+    const leader = this.party?.leader ?? members[0] ?? null;
+    const fallbackX = Number.isFinite(leader?.x) ? leader.x + 96 : 0;
+    const fallbackY = Number.isFinite(leader?.y) ? leader.y : 0;
+    return { x: fallbackX, y: fallbackY };
+  }
+
+  _partyEntityId(member) {
+    if (!member) return null;
+    if (member.id) return member.id;
+    if (Array.isArray(this.party?.members)) {
+      const index = this.party.members.indexOf(member);
+      if (index >= 0) {
+        return `party-${index}`;
+      }
+    }
+    return member.name ?? null;
+  }
+
+  _fxEnemyHit(enemy, damage) {
+    if (!enemy) return;
+    const anchor = this._getEnemyAnchor(enemy);
+    const baseY = anchor.y - 28;
+    const amount = Math.max(0, Math.round(damage));
+    if (amount > 0) {
+      Fx.spawnFloaty({ x: anchor.x, y: baseY, text: `-${amount}`, kind: 'dmg' });
+      const duration = 150 + Math.min(200, amount * 10);
+      const amplitude = Math.min(9, 2 + amount * 0.45);
+      Fx.shake({ duration, amplitude, frequency: 22, falloff: 1.1 });
+      Fx.flashTarget(enemy.id, { color: 'rgba(255, 150, 90, 0.9)', ms: 140, intensity: 0.9 });
+      if (enemy.hp <= 0) {
+        Fx.spawnFloaty({ x: anchor.x, y: baseY - 24, text: 'KO!', kind: 'info' });
+      }
+    } else {
+      Fx.spawnFloaty({ x: anchor.x, y: baseY, text: 'Miss', kind: 'miss' });
+    }
+  }
+
+  _fxPartyHit(member, damage) {
+    if (!member) return;
+    const anchorX = Number.isFinite(member.x) ? member.x : 0;
+    const anchorY = Number.isFinite(member.y) ? member.y : 0;
+    const entityId = this._partyEntityId(member);
+    const amount = Math.max(0, Math.round(damage));
+    if (amount > 0) {
+      Fx.spawnFloaty({ x: anchorX, y: anchorY - 30, text: `-${amount}`, kind: 'dmg' });
+      const duration = 200 + Math.min(240, amount * 12);
+      const amplitude = Math.min(10, 3 + amount * 0.5);
+      Fx.shake({ duration, amplitude, frequency: 18, falloff: 1.2 });
+      if (entityId) {
+        Fx.flashTarget(entityId, { color: 'rgba(255, 120, 120, 0.95)', ms: 160, intensity: 1 });
+      }
+    } else {
+      Fx.spawnFloaty({ x: anchorX, y: anchorY - 30, text: 'Block', kind: 'block' });
+      if (entityId) {
+        Fx.flashTarget(entityId, { color: 'rgba(160, 200, 255, 0.75)', ms: 120, intensity: 0.6 });
+      }
+    }
   }
 
   _checkVictory() {
