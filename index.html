@@ -12,7 +12,17 @@
       <canvas id="game" aria-label="World view"></canvas>
       <div class="overlay" aria-live="polite">
         <div id="statusText" class="status">Use WASD or the arrow keys to explore.</div>
-        <div id="terrainLabel" class="terrain">Terrain: -</div>
+        <div class="overlay-bottom">
+          <div class="minimap-card">
+            <div class="minimap-title" aria-hidden="true">Map</div>
+            <canvas
+              id="minimap"
+              role="img"
+              aria-label="Mini map overview of the current area"
+            ></canvas>
+          </div>
+          <div id="terrainLabel" class="terrain">Terrain: -</div>
+        </div>
       </div>
     </main>
     <aside class="sidebar" aria-label="Party and inventory">
