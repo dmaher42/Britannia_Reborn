@@ -853,12 +853,45 @@ const drawCastleProp = (ctx, prop, cam) => {
   ctx.fillRect(hallX, hallY, hallWidth, hallHeight);
   ctx.restore();
 
-  const windowRows = 3;
   const windowCols = 5;
+  const windowRows = 3;
   const windowSpacingX = hallWidth / (windowCols + 1);
   const windowSpacingY = hallHeight / (windowRows + 3);
   const hallWindowWidth = windowSpacingX * 0.48;
   const hallWindowHeight = windowSpacingY * 0.9;
+  const buttressWidth = Math.max(16, hallWindowWidth * 0.18);
+  const buttressTopWidth = buttressWidth * 0.55;
+  const buttressTopY = hallY + hallHeight * 0.3;
+  const buttressBaseY = hallY + hallHeight;
+  ctx.save();
+  const buttressFill = lightenColor(palette.stoneMid, 0.08);
+  const buttressEdge = darkenColor(palette.stoneShadow, 0.08);
+  const buttressHighlight = lightenColor(palette.stoneLight, 0.28);
+  for (let i = 0; i <= windowCols; i += 1) {
+    const center = hallX + windowSpacingX * (i + 0.5);
+    const baseLeft = center - buttressWidth / 2;
+    const baseRight = center + buttressWidth / 2;
+    const topLeft = center - buttressTopWidth / 2;
+    const topRight = center + buttressTopWidth / 2;
+    ctx.beginPath();
+    ctx.moveTo(baseLeft, buttressBaseY);
+    ctx.lineTo(baseRight, buttressBaseY);
+    ctx.lineTo(topRight, buttressTopY);
+    ctx.lineTo(topLeft, buttressTopY);
+    ctx.closePath();
+    ctx.fillStyle = buttressFill;
+    ctx.fill();
+    ctx.strokeStyle = buttressEdge;
+    ctx.lineWidth = Math.max(1, buttressWidth * 0.12);
+    ctx.stroke();
+    ctx.strokeStyle = buttressHighlight;
+    ctx.lineWidth = Math.max(1, buttressWidth * 0.06);
+    ctx.beginPath();
+    ctx.moveTo(topLeft + buttressTopWidth * 0.2, buttressTopY + (buttressBaseY - buttressTopY) * 0.18);
+    ctx.lineTo(baseLeft + buttressWidth * 0.2, buttressBaseY - (buttressBaseY - buttressTopY) * 0.22);
+    ctx.stroke();
+  }
+  ctx.restore();
   for (let row = 0; row < windowRows; row += 1) {
     for (let col = 0; col < windowCols; col += 1) {
       const wx = hallX + windowSpacingX * (col + 1) - hallWindowWidth / 2;
@@ -922,10 +955,92 @@ const drawCastleProp = (ctx, prop, cam) => {
   ctx.lineWidth = Math.max(2, keepWidth * 0.02);
   ctx.stroke();
 
+  const flagpoleX = keepX + keepWidth / 2;
+  const flagpoleBaseY = keepY - roofHeight;
+  const flagpoleHeight = roofHeight * 1.4;
+  ctx.save();
+  ctx.strokeStyle = lightenColor(palette.bannerSecondary, 0.15);
+  ctx.lineWidth = Math.max(1.5, keepWidth * 0.015);
+  ctx.beginPath();
+  ctx.moveTo(flagpoleX, flagpoleBaseY);
+  ctx.lineTo(flagpoleX, flagpoleBaseY - flagpoleHeight);
+  ctx.stroke();
+  ctx.fillStyle = palette.bannerPrimary;
+  ctx.beginPath();
+  ctx.moveTo(flagpoleX, flagpoleBaseY - flagpoleHeight);
+  ctx.lineTo(flagpoleX + keepWidth * 0.14, flagpoleBaseY - flagpoleHeight * 0.82);
+  ctx.lineTo(flagpoleX, flagpoleBaseY - flagpoleHeight * 0.62);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = palette.bannerSecondary;
+  ctx.lineWidth = Math.max(1, keepWidth * 0.01);
+  ctx.stroke();
+  ctx.restore();
+
   const gateWidth = prop.detail?.gateWidth ?? hallWidth * 0.26;
   const gateHeight = hallHeight * 0.55;
   const gateX = width / 2 - gateWidth / 2;
   const gateY = hallY + hallHeight - gateHeight;
+
+  const gateTowerWidth = Math.min(gateWidth * 0.32, hallWidth * 0.18);
+  const gateTowerHeight = gateHeight * 0.9;
+  const gateTowerRadius = gateTowerWidth * 0.45;
+  const gateTowerOverlap = gateTowerWidth * 0.25;
+  const gateTowerY = gateY + gateHeight - gateTowerHeight;
+  const gateTowerShadow = darkenColor(palette.stoneShadow, 0.08);
+  const gateTowerHighlight = lightenColor(palette.stoneLight, 0.22);
+  const drawGatehouseTower = (towerX, lightenLeft = false) => {
+    ctx.save();
+    const gradient = ctx.createLinearGradient(towerX, gateTowerY, towerX + gateTowerWidth, gateTowerY);
+    if (lightenLeft) {
+      gradient.addColorStop(0, gateTowerHighlight);
+      gradient.addColorStop(0.5, palette.stoneMid);
+      gradient.addColorStop(1, gateTowerShadow);
+    } else {
+      gradient.addColorStop(0, gateTowerShadow);
+      gradient.addColorStop(0.5, palette.stoneMid);
+      gradient.addColorStop(1, gateTowerHighlight);
+    }
+    ctx.fillStyle = gradient;
+    drawRoundedRectPath(ctx, towerX, gateTowerY, gateTowerWidth, gateTowerHeight, gateTowerRadius);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(15, 13, 12, 0.45)';
+    ctx.lineWidth = Math.max(1.2, gateTowerWidth * 0.07);
+    ctx.stroke();
+
+    const slitWidth = gateTowerWidth * 0.28;
+    const slitHeight = gateTowerHeight * 0.12;
+    const slitOffsetX = towerX + gateTowerWidth / 2 - slitWidth / 2;
+    ctx.fillStyle = 'rgba(18, 24, 34, 0.7)';
+    for (let i = 0; i < 3; i += 1) {
+      const slitY = gateTowerY + gateTowerHeight * (0.28 + i * 0.2);
+      ctx.fillRect(slitOffsetX, slitY, slitWidth, slitHeight);
+    }
+
+    drawBattlements(
+      ctx,
+      towerX,
+      gateTowerY,
+      gateTowerWidth,
+      battlementHeight * 0.75,
+      lightenColor(palette.stoneLight, 0.25),
+      darkenColor(palette.stoneShadow, 0.08)
+    );
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+    ctx.beginPath();
+    ctx.ellipse(
+      towerX + gateTowerWidth / 2,
+      gateY + gateHeight + gateTowerWidth * 0.15,
+      gateTowerWidth * 0.6,
+      gateTowerWidth * 0.24,
+      0,
+      0,
+      Math.PI * 2
+    );
+    ctx.fill();
+    ctx.restore();
+  };
 
   const lowerWingHeight = hallHeight * 0.26;
   const lowerWingY = hallY + hallHeight - lowerWingHeight;
@@ -934,6 +1049,23 @@ const drawCastleProp = (ctx, prop, cam) => {
   lowerWingGradient.addColorStop(1, palette.stoneShadow);
   ctx.fillStyle = lowerWingGradient;
   ctx.fillRect(hallX, lowerWingY, hallWidth, lowerWingHeight);
+
+  const courtyardPathGradient = ctx.createLinearGradient(0, gateY + gateHeight, 0, keepY + keepHeight);
+  courtyardPathGradient.addColorStop(0, 'rgba(210, 188, 150, 0.28)');
+  courtyardPathGradient.addColorStop(1, 'rgba(180, 160, 120, 0)');
+  ctx.beginPath();
+  ctx.moveTo(gateX + gateWidth * 0.12, gateY + gateHeight);
+  ctx.lineTo(gateX + gateWidth * 0.88, gateY + gateHeight);
+  ctx.lineTo(keepX + keepWidth * 0.62, keepY + keepHeight);
+  ctx.lineTo(keepX + keepWidth * 0.38, keepY + keepHeight);
+  ctx.closePath();
+  ctx.fillStyle = courtyardPathGradient;
+  ctx.fill();
+
+  const leftTowerX = gateX - (gateTowerWidth - gateTowerOverlap);
+  const rightTowerX = gateX + gateWidth - gateTowerOverlap;
+  drawGatehouseTower(leftTowerX, true);
+  drawGatehouseTower(rightTowerX, false);
 
   const lowerWindowWidth = hallWindowWidth * 0.82;
   const lowerWindowHeight = hallWindowHeight * 0.95;
@@ -977,6 +1109,40 @@ const drawCastleProp = (ctx, prop, cam) => {
     ctx.lineTo(px, gateY + gateHeight - gateHeight * 0.08);
     ctx.stroke();
   }
+
+  ctx.save();
+  ctx.strokeStyle = 'rgba(30, 22, 20, 0.5)';
+  ctx.lineWidth = Math.max(1, gateWidth * 0.02);
+  const portcullisColumns = 6;
+  for (let i = 0; i <= portcullisColumns; i += 1) {
+    const px = gateX + (gateWidth / portcullisColumns) * i;
+    ctx.beginPath();
+    ctx.moveTo(px, gateY + gateHeight * 0.28);
+    ctx.lineTo(px, gateY + gateHeight - gateHeight * 0.06);
+    ctx.stroke();
+  }
+  const portcullisRows = 3;
+  for (let i = 0; i < portcullisRows; i += 1) {
+    const py = gateY + gateHeight * (0.32 + i * 0.18);
+    ctx.beginPath();
+    ctx.moveTo(gateX + gateWidth * 0.08, py);
+    ctx.lineTo(gateX + gateWidth * 0.92, py);
+    ctx.stroke();
+  }
+  const toothWidth = gateWidth / (portcullisColumns * 2.2);
+  const toothHeight = gateHeight * 0.08;
+  ctx.fillStyle = 'rgba(26, 18, 16, 0.75)';
+  for (let i = 0; i < portcullisColumns; i += 1) {
+    const toothX = gateX + (gateWidth / portcullisColumns) * i + toothWidth * 0.6;
+    const toothY = gateY + gateHeight - gateHeight * 0.06;
+    ctx.beginPath();
+    ctx.moveTo(toothX, toothY);
+    ctx.lineTo(toothX + toothWidth, toothY);
+    ctx.lineTo(toothX + toothWidth / 2, toothY + toothHeight);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
 
   const stepHeight = hallHeight * 0.08;
   const stepY = hallY + hallHeight - stepHeight;
@@ -1881,15 +2047,17 @@ export const RoomLibrary = {
       { x: 620, y: 480, w: 320, h: 260, type: 'rock' },
       { x: 2140, y: 480, w: 320, h: 260, type: 'rock' },
       { x: 760, y: 640, w: 620, h: 720, type: 'wall' },
-      { x: 1380, y: 560, w: 720, h: 560, type: 'wall' },
+      { x: 1380, y: 560, w: 100, h: 560, type: 'wall' },
+      { x: 1800, y: 560, w: 300, h: 560, type: 'wall' },
       { x: 2080, y: 640, w: 620, h: 720, type: 'wall' },
-      { x: 1100, y: 1080, w: 960, h: 160, type: 'wall' },
-      { x: 1100, y: 1320, w: 440, h: 140, type: 'wall' },
-      { x: 1620, y: 1320, w: 440, h: 140, type: 'wall' },
+      { x: 1100, y: 1080, w: 380, h: 160, type: 'wall' },
+      { x: 1800, y: 1080, w: 260, h: 160, type: 'wall' },
+      { x: 1100, y: 1320, w: 380, h: 140, type: 'wall' },
+      { x: 1800, y: 1320, w: 260, h: 140, type: 'wall' },
       { x: 760, y: 1380, w: 620, h: 180, type: 'wall' },
       { x: 2080, y: 1380, w: 620, h: 180, type: 'wall' },
-      { x: 1100, y: 1540, w: 460, h: 140, type: 'wall' },
-      { x: 1680, y: 1540, w: 460, h: 140, type: 'wall' }
+      { x: 1100, y: 1540, w: 380, h: 140, type: 'wall' },
+      { x: 1800, y: 1540, w: 340, h: 140, type: 'wall' }
     ],
     props: [
       {
@@ -1901,9 +2069,9 @@ export const RoomLibrary = {
         primaryColor: '#2d4f8f',
         secondaryColor: '#f3cf6b',
         accentColor: '#fef2d0',
-        detail: { gateWidth: 520 }
+        detail: { gateWidth: 320 }
       },
-      { x: 1380, y: 1500, w: 520, h: 780, type: 'causeway' },
+      { x: 1480, y: 1500, w: 320, h: 780, type: 'causeway' },
       {
         x: 1080,
         y: 1540,
