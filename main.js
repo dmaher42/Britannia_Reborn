@@ -7,6 +7,7 @@ import { InputController } from './controls.js';
 import { setupUI } from './ui.js';
 import { clamp } from './utils.js';
 import { drawCharacterModel } from './character-models.js';
+import { initTooltips } from './public/ui/tooltip.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -48,6 +49,13 @@ party.members[0].addToBackpack({ id: 'bedroll', name: 'Bedroll', weight: 1.2, qt
 const spellbook = new Spellbook(inventory, party);
 const combat = new CombatSystem(party, { spellbook });
 const input = new InputController(window);
+
+const ACTION_TIP_MAP = {
+  'btn-talk': 'Speak with nearby NPCs.',
+  'btn-start-combat': 'Enter tactical mode; actions cost AP.',
+  'btn-cast-fire-dart': 'Single-target fire spell. Uses Sulfur Ash.',
+  'btn-end-turn': "Finish current actor's turn."
+};
 
 function getActiveCharacter() {
   return party.leader ?? null;
@@ -180,6 +188,19 @@ const ui = setupUI({
       ui.showToast('The skirmish is already underway.');
     }
   },
+  onEndTurn: () => {
+    if (!combat) {
+      ui.showToast('No combat is underway.');
+      return;
+    }
+    const ended = combat.endPlayerTurn();
+    if (ended) {
+      ui.log('The party yields the initiative.');
+      ui.showToast('Turn ended.');
+    } else {
+      ui.showToast('No active turn to end.');
+    }
+  },
   onAddLoot: () => {
     inventory.add({ id: 'chain_mail', name: 'Chain Mail', weight: 6, qty: 1, equip: 'torso', tag: 'armor' });
     inventory.add({ id: 'spider_silk', name: 'Spider Silk', weight: 0.4, qty: 2, tag: 'reagent' });
@@ -191,6 +212,8 @@ const ui = setupUI({
   onEquipItem: handleEquipItem,
   onUseItem: handleUseItem
 });
+
+initTooltips({ selector: '.action-btn,[data-tip]', tipMap: ACTION_TIP_MAP });
 
 combat.onEvent((event, payload) => {
   if (event !== 'complete') return;

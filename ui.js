@@ -11,6 +11,7 @@ export function setupUI({
   onTalk,
   onCast,
   onStartCombat,
+  onEndTurn,
   onAddLoot,
   onEquipItem,
   onUseItem
@@ -25,9 +26,10 @@ export function setupUI({
   const toast = document.getElementById('toast');
   const destinationSelect = document.getElementById('destinationSelect');
   const buttonTravel = document.getElementById('btnTravel');
-  const buttonTalk = document.getElementById('btnTalk');
-  const buttonCast = document.getElementById('btnCast');
-  const buttonCombat = document.getElementById('btnCombat');
+  const buttonTalk = document.getElementById('btn-talk');
+  const buttonCast = document.getElementById('btn-cast-fire-dart');
+  const buttonCombat = document.getElementById('btn-start-combat');
+  const buttonEndTurn = document.getElementById('btn-end-turn');
   const buttonLoot = document.getElementById('btnAddLoot');
   const sidebar = document.querySelector('.sidebar');
   const logPanelElement = document.querySelector('.panel.log');
@@ -161,6 +163,7 @@ export function setupUI({
   addButtonHandler(buttonTalk, onTalk);
   addButtonHandler(buttonCast, onCast);
   addButtonHandler(buttonCombat, onStartCombat);
+  addButtonHandler(buttonEndTurn, onEndTurn);
   addButtonHandler(buttonLoot, onAddLoot);
 
   if (destinationSelect) {
@@ -329,6 +332,10 @@ export function setupUI({
     const isActive = !!snapshot?.active;
     combatPanel.hidden = !isActive;
 
+    if (buttonEndTurn) {
+      buttonEndTurn.disabled = !isActive;
+    }
+
     if (!isActive) {
       selectedEnemyId = null;
       if (combatTurnLabel) {
@@ -403,6 +410,9 @@ export function setupUI({
     }
     if (combatCastButton) {
       combatCastButton.disabled = !(canAct && hasTarget && canCastSpells);
+    }
+    if (buttonEndTurn) {
+      buttonEndTurn.disabled = !canAct;
     }
   }
 
