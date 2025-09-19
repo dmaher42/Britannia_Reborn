@@ -103,26 +103,358 @@ const drawCastleProp = (ctx, prop, cam) => {
     bannerAccent: prop.accentColor || '#fef2c6'
   };
 
-  const hallHeight = height * 0.62;
-  const hallY = height - hallHeight;
-  const towerWidth = Math.min(width * 0.18, 220);
-  const towerHeight = hallHeight + height * 0.18;
-  const battlementHeight = Math.max(18, height * 0.07);
+  const hallThemes = [
+    { name: 'Great Hall', type: 'banquet', ambient: '#2b1d13' },
+    { name: 'War Room', type: 'war', ambient: '#1e262f' },
+    { name: "Royal Chapel", type: 'chapel', ambient: '#22192b' },
+    { name: 'Scholars\' Library', type: 'library', ambient: '#1c1913' },
+    { name: 'Guard Barracks', type: 'barracks', ambient: '#1f2324' },
+    { name: 'Solar Study', type: 'study', ambient: '#1c2028' },
+    { name: 'Crystal Observatory', type: 'observatory', ambient: '#141e2c' },
+    { name: 'Indoor Garden', type: 'garden', ambient: '#15221a' }
+  ];
+  const keepThemes = [
+    { name: 'Throne Room', type: 'throne', ambient: '#2b1810' },
+    { name: 'Royal Chambers', type: 'royal', ambient: '#1e1a24' },
+    { name: 'Arcane Laboratory', type: 'alchemy', ambient: '#161d23' },
+    { name: 'Vaulted Observatory', type: 'observatory', ambient: '#101827' }
+  ];
+  const towerThemes = [
+    { name: 'Armory', type: 'armory', ambient: '#1c2126' },
+    { name: 'Guard Quarters', type: 'barracks', ambient: '#1b2527' },
+    { name: 'Signal Room', type: 'war', ambient: '#121b26' },
+    { name: 'Aerie Study', type: 'study', ambient: '#1c212b' }
+  ];
+  const lowerThemes = [
+    { name: 'Gatehouse', type: 'armory', ambient: '#1c1f24' },
+    { name: 'Stables', type: 'stable', ambient: '#201d14' },
+    { name: 'Servants\' Hall', type: 'banquet', ambient: '#241c14' },
+    { name: 'Cellars', type: 'storage', ambient: '#161513' },
+    { name: 'Ready Barracks', type: 'barracks', ambient: '#1f2324' }
+  ];
 
-  const drawWindow = (wx, wy, ww, wh) => {
-    drawRoundedRectPath(ctx, wx, wy, ww, wh, Math.min(ww, wh) * 0.35);
-    const gradient = ctx.createLinearGradient(0, wy, 0, wy + wh);
-    gradient.addColorStop(0, palette.windowGlow);
-    gradient.addColorStop(1, palette.windowDark);
-    ctx.fillStyle = gradient;
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(12, 18, 28, 0.45)';
-    ctx.lineWidth = Math.max(1, ww * 0.12);
-    ctx.stroke();
+  const drawRoomInterior = (x, y, w, h, theme) => {
+    if (!theme) return;
+    ctx.save();
+    const centerX = x + w / 2;
+
+    switch (theme.type) {
+      case 'throne': {
+        ctx.fillStyle = '#3b1f1b';
+        ctx.fillRect(centerX - w * 0.32, y + h * 0.82, w * 0.64, h * 0.08);
+        ctx.fillStyle = '#a3713c';
+        drawRoundedRectPath(ctx, centerX - w * 0.18, y + h * 0.56, w * 0.36, h * 0.28, w * 0.08);
+        ctx.fill();
+        ctx.fillStyle = '#d6be7a';
+        drawRoundedRectPath(ctx, centerX - w * 0.12, y + h * 0.46, w * 0.24, h * 0.18, w * 0.12);
+        ctx.fill();
+        ctx.fillStyle = '#f7e4b6';
+        ctx.beginPath();
+        ctx.moveTo(centerX, y + h * 0.32);
+        ctx.lineTo(centerX + w * 0.09, y + h * 0.46);
+        ctx.lineTo(centerX - w * 0.09, y + h * 0.46);
+        ctx.closePath();
+        ctx.fill();
+        break;
+      }
+      case 'banquet': {
+        ctx.fillStyle = '#6d4a28';
+        drawRoundedRectPath(ctx, x + w * 0.1, y + h * 0.58, w * 0.8, h * 0.2, h * 0.08);
+        ctx.fill();
+        ctx.fillStyle = '#c59a58';
+        for (let i = 0; i < 4; i += 1) {
+          const seatX = x + w * 0.16 + i * w * 0.18;
+          ctx.fillRect(seatX, y + h * 0.5, w * 0.12, h * 0.08);
+          ctx.fillRect(seatX, y + h * 0.78, w * 0.12, h * 0.08);
+        }
+        ctx.fillStyle = '#f4dfac';
+        ctx.beginPath();
+        ctx.arc(centerX, y + h * 0.62, w * 0.04, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+      }
+      case 'war': {
+        const tableW = w * 0.62;
+        const tableH = h * 0.2;
+        const tableX = centerX - tableW / 2;
+        const tableY = y + h * 0.6;
+        ctx.fillStyle = '#374051';
+        drawRoundedRectPath(ctx, tableX, tableY, tableW, tableH, tableH * 0.25);
+        ctx.fill();
+        ctx.strokeStyle = '#6d8bb8';
+        ctx.lineWidth = Math.max(1, w * 0.02);
+        ctx.strokeRect(tableX + tableW * 0.12, tableY + tableH * 0.15, tableW * 0.76, tableH * 0.6);
+        ctx.fillStyle = '#b04e3a';
+        ctx.beginPath();
+        ctx.arc(tableX + tableW * 0.25, tableY + tableH * 0.52, w * 0.03, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#c5b567';
+        ctx.beginPath();
+        ctx.moveTo(tableX + tableW * 0.7, tableY + tableH * 0.3);
+        ctx.lineTo(tableX + tableW * 0.8, tableY + tableH * 0.6);
+        ctx.lineTo(tableX + tableW * 0.6, tableY + tableH * 0.6);
+        ctx.closePath();
+        ctx.fill();
+        break;
+      }
+      case 'chapel': {
+        ctx.fillStyle = '#bda98a';
+        drawRoundedRectPath(ctx, centerX - w * 0.14, y + h * 0.62, w * 0.28, h * 0.2, w * 0.1);
+        ctx.fill();
+        ctx.fillStyle = '#f1e1c2';
+        ctx.fillRect(centerX - w * 0.03, y + h * 0.42, w * 0.06, h * 0.2);
+        ctx.strokeStyle = '#f8e8c8';
+        ctx.lineWidth = Math.max(1, w * 0.03);
+        ctx.beginPath();
+        ctx.moveTo(centerX, y + h * 0.38);
+        ctx.lineTo(centerX, y + h * 0.55);
+        ctx.moveTo(centerX - w * 0.06, y + h * 0.46);
+        ctx.lineTo(centerX + w * 0.06, y + h * 0.46);
+        ctx.stroke();
+        ctx.fillStyle = '#7c5a3a';
+        for (let i = 0; i < 2; i += 1) {
+          ctx.fillRect(x + w * 0.12, y + h * (0.66 + i * 0.1), w * 0.28, h * 0.08);
+          ctx.fillRect(x + w * 0.6, y + h * (0.66 + i * 0.1), w * 0.28, h * 0.08);
+        }
+        break;
+      }
+      case 'library': {
+        ctx.fillStyle = '#4c3521';
+        const shelfW = w * 0.18;
+        const shelfH = h * 0.68;
+        ctx.fillRect(x + w * 0.08, y + h * 0.18, shelfW, shelfH);
+        ctx.fillRect(x + w * 0.74, y + h * 0.18, shelfW, shelfH);
+        ctx.strokeStyle = '#d0a45c';
+        ctx.lineWidth = Math.max(1, w * 0.02);
+        for (let i = 1; i < 4; i += 1) {
+          const shelfY = y + h * (0.22 + i * 0.14);
+          ctx.beginPath();
+          ctx.moveTo(x + w * 0.08, shelfY);
+          ctx.lineTo(x + w * 0.26, shelfY);
+          ctx.moveTo(x + w * 0.74, shelfY);
+          ctx.lineTo(x + w * 0.92, shelfY);
+          ctx.stroke();
+        }
+        ctx.fillStyle = '#6e4321';
+        drawRoundedRectPath(ctx, centerX - w * 0.2, y + h * 0.64, w * 0.4, h * 0.16, h * 0.06);
+        ctx.fill();
+        ctx.fillStyle = '#d9c38b';
+        ctx.fillRect(centerX - w * 0.06, y + h * 0.62, w * 0.12, h * 0.06);
+        break;
+      }
+      case 'barracks': {
+        const bunkWidth = w * 0.32;
+        const bunkHeight = h * 0.16;
+        for (let side = 0; side < 2; side += 1) {
+          const baseX = side === 0 ? x + w * 0.12 : x + w * 0.56;
+          ctx.fillStyle = '#3c464f';
+          ctx.fillRect(baseX, y + h * 0.58, bunkWidth, bunkHeight);
+          ctx.fillRect(baseX, y + h * 0.74, bunkWidth, bunkHeight);
+          ctx.fillStyle = '#9bb4c8';
+          ctx.fillRect(baseX + w * 0.02, y + h * 0.61, bunkWidth - w * 0.04, bunkHeight * 0.35);
+          ctx.fillRect(baseX + w * 0.02, y + h * 0.77, bunkWidth - w * 0.04, bunkHeight * 0.35);
+        }
+        ctx.fillStyle = '#7b5a32';
+        ctx.fillRect(centerX - w * 0.05, y + h * 0.62, w * 0.1, h * 0.25);
+        break;
+      }
+      case 'study': {
+        ctx.fillStyle = '#463421';
+        ctx.fillRect(x + w * 0.18, y + h * 0.2, w * 0.64, h * 0.3);
+        ctx.fillStyle = '#70472d';
+        drawRoundedRectPath(ctx, centerX - w * 0.22, y + h * 0.6, w * 0.44, h * 0.2, h * 0.08);
+        ctx.fill();
+        ctx.fillStyle = '#cdbd8a';
+        ctx.fillRect(centerX - w * 0.08, y + h * 0.62, w * 0.16, h * 0.08);
+        ctx.fillStyle = '#e8d5aa';
+        ctx.beginPath();
+        ctx.moveTo(centerX + w * 0.05, y + h * 0.62);
+        ctx.lineTo(centerX + w * 0.12, y + h * 0.48);
+        ctx.lineTo(centerX + w * 0.14, y + h * 0.66);
+        ctx.closePath();
+        ctx.fill();
+        break;
+      }
+      case 'observatory': {
+        ctx.strokeStyle = 'rgba(176, 208, 255, 0.65)';
+        ctx.lineWidth = Math.max(1, w * 0.015);
+        for (let i = 0; i < 3; i += 1) {
+          ctx.beginPath();
+          const angle = (Math.PI * (i + 2)) / 6;
+          ctx.arc(centerX, y + h * 0.35, w * 0.4, angle, angle + Math.PI * 0.25);
+          ctx.stroke();
+        }
+        ctx.fillStyle = '#526c9c';
+        ctx.beginPath();
+        ctx.moveTo(centerX - w * 0.24, y + h * 0.68);
+        ctx.lineTo(centerX + w * 0.1, y + h * 0.58);
+        ctx.lineTo(centerX + w * 0.22, y + h * 0.78);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#b4c7f5';
+        ctx.beginPath();
+        ctx.arc(centerX + w * 0.05, y + h * 0.64, w * 0.08, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+      }
+      case 'garden': {
+        ctx.fillStyle = '#345b34';
+        ctx.fillRect(x + w * 0.12, y + h * 0.7, w * 0.76, h * 0.16);
+        ctx.fillStyle = '#2f6f3a';
+        ctx.beginPath();
+        ctx.arc(centerX, y + h * 0.55, w * 0.25, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#8c5e2f';
+        ctx.fillRect(centerX - w * 0.03, y + h * 0.6, w * 0.06, h * 0.2);
+        ctx.fillStyle = '#d1e4a5';
+        ctx.beginPath();
+        ctx.arc(x + w * 0.24, y + h * 0.62, w * 0.08, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(x + w * 0.76, y + h * 0.62, w * 0.08, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+      }
+      case 'royal': {
+        ctx.fillStyle = '#6d3e3b';
+        drawRoundedRectPath(ctx, centerX - w * 0.28, y + h * 0.62, w * 0.56, h * 0.24, w * 0.12);
+        ctx.fill();
+        ctx.fillStyle = '#d7b9b0';
+        ctx.fillRect(centerX - w * 0.26, y + h * 0.64, w * 0.52, h * 0.12);
+        ctx.fillStyle = '#eadfc4';
+        ctx.beginPath();
+        ctx.moveTo(centerX - w * 0.28, y + h * 0.62);
+        ctx.lineTo(centerX, y + h * 0.4);
+        ctx.lineTo(centerX + w * 0.28, y + h * 0.62);
+        ctx.closePath();
+        ctx.fill();
+        break;
+      }
+      case 'alchemy': {
+        ctx.fillStyle = '#3f3e5c';
+        drawRoundedRectPath(ctx, centerX - w * 0.22, y + h * 0.62, w * 0.44, h * 0.18, h * 0.08);
+        ctx.fill();
+        const flaskPositions = [-0.14, 0, 0.16];
+        const flaskColors = ['#6ad4f4', '#ef72b5', '#f5f1a1'];
+        flaskPositions.forEach((offset, index) => {
+          ctx.fillStyle = flaskColors[index];
+          ctx.beginPath();
+          const baseX = centerX + w * offset;
+          const baseY = y + h * 0.62;
+          ctx.moveTo(baseX - w * 0.03, baseY);
+          ctx.lineTo(baseX + w * 0.03, baseY);
+          ctx.lineTo(baseX + w * 0.02, baseY - h * 0.18);
+          ctx.arc(baseX, baseY - h * 0.2, w * 0.02, 0, Math.PI * 2);
+          ctx.lineTo(baseX - w * 0.02, baseY - h * 0.18);
+          ctx.closePath();
+          ctx.fill();
+        });
+        ctx.fillStyle = '#b8d0f2';
+        ctx.fillRect(centerX - w * 0.12, y + h * 0.46, w * 0.24, h * 0.05);
+        break;
+      }
+      case 'armory': {
+        ctx.fillStyle = '#5a3d26';
+        ctx.fillRect(x + w * 0.18, y + h * 0.6, w * 0.64, h * 0.22);
+        ctx.strokeStyle = '#cfcac0';
+        ctx.lineWidth = Math.max(1, w * 0.025);
+        for (let i = 0; i < 3; i += 1) {
+          const px = x + w * (0.26 + i * 0.18);
+          ctx.beginPath();
+          ctx.moveTo(px, y + h * 0.3);
+          ctx.lineTo(px, y + h * 0.6);
+          ctx.stroke();
+          ctx.fillStyle = '#bbb7aa';
+          ctx.beginPath();
+          ctx.moveTo(px - w * 0.05, y + h * 0.45);
+          ctx.lineTo(px + w * 0.05, y + h * 0.45);
+          ctx.lineTo(px, y + h * 0.34);
+          ctx.closePath();
+          ctx.fill();
+          ctx.fillStyle = '#5a3d26';
+        }
+        break;
+      }
+      case 'stable': {
+        ctx.fillStyle = '#8b6529';
+        ctx.fillRect(x + w * 0.12, y + h * 0.68, w * 0.76, h * 0.18);
+        ctx.fillStyle = '#d8bb66';
+        ctx.fillRect(x + w * 0.16, y + h * 0.64, w * 0.28, h * 0.1);
+        ctx.fillRect(x + w * 0.56, y + h * 0.64, w * 0.28, h * 0.1);
+        ctx.fillStyle = '#c4983b';
+        ctx.beginPath();
+        ctx.arc(centerX, y + h * 0.58, w * 0.18, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#3d2a16';
+        ctx.fillRect(centerX - w * 0.02, y + h * 0.6, w * 0.04, h * 0.26);
+        break;
+      }
+      case 'storage': {
+        ctx.fillStyle = '#7c5130';
+        ctx.fillRect(x + w * 0.18, y + h * 0.66, w * 0.28, h * 0.22);
+        ctx.fillRect(x + w * 0.56, y + h * 0.66, w * 0.24, h * 0.22);
+        ctx.fillStyle = '#b9864e';
+        ctx.beginPath();
+        ctx.arc(centerX, y + h * 0.62, w * 0.12, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#311f12';
+        ctx.lineWidth = Math.max(1, w * 0.02);
+        ctx.strokeRect(x + w * 0.18, y + h * 0.66, w * 0.28, h * 0.22);
+        ctx.strokeRect(x + w * 0.56, y + h * 0.66, w * 0.24, h * 0.22);
+        break;
+      }
+      default: {
+        ctx.fillStyle = '#2a2f38';
+        ctx.fillRect(x + w * 0.2, y + h * 0.6, w * 0.6, h * 0.2);
+        break;
+      }
+    }
+
+    ctx.restore();
   };
 
-  const towerGradient = ctx.createLinearGradient(0, hallY - height * 0.1, 0, height);
-  towerGradient.addColorStop(0, lightenColor(palette.stoneLight, 0.1));
+  const drawWindow = (wx, wy, ww, wh, theme, options = {}) => {
+    const { bars = true, radius = Math.min(ww, wh) * 0.35 } = options;
+    ctx.save();
+    drawRoundedRectPath(ctx, wx, wy, ww, wh, radius);
+    ctx.fillStyle = theme?.ambient ?? palette.windowDark;
+    ctx.fill();
+    ctx.clip();
+    drawRoomInterior(wx, wy, ww, wh, theme);
+    const gradient = ctx.createLinearGradient(0, wy, 0, wy + wh);
+    gradient.addColorStop(0, lightenColor(palette.windowGlow, 0.15));
+    gradient.addColorStop(1, palette.windowDark);
+    ctx.globalAlpha = 0.82;
+    ctx.fillStyle = gradient;
+    ctx.fillRect(wx, wy, ww, wh);
+    ctx.restore();
+
+    ctx.save();
+    ctx.lineWidth = Math.max(1.2, ww * 0.08);
+    ctx.strokeStyle = 'rgba(15, 22, 33, 0.6)';
+    drawRoundedRectPath(ctx, wx, wy, ww, wh, radius);
+    ctx.stroke();
+    if (bars) {
+      ctx.lineWidth = Math.max(1, ww * 0.05);
+      ctx.strokeStyle = 'rgba(246, 238, 210, 0.35)';
+      ctx.beginPath();
+      ctx.moveTo(wx + ww / 2, wy + radius * 0.35);
+      ctx.lineTo(wx + ww / 2, wy + wh - radius * 0.35);
+      ctx.moveTo(wx + ww * 0.12, wy + wh / 2);
+      ctx.lineTo(wx + ww - ww * 0.12, wy + wh / 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  };
+
+  const hallHeight = height * 0.62;
+  const hallY = height - hallHeight;
+  const towerWidth = Math.min(width * 0.18, 260);
+  const towerHeight = hallHeight + height * 0.22;
+  const battlementHeight = Math.max(18, height * 0.07);
+
+  const towerGradient = ctx.createLinearGradient(0, hallY - height * 0.08, 0, height);
+  towerGradient.addColorStop(0, lightenColor(palette.stoneLight, 0.12));
   towerGradient.addColorStop(1, palette.stoneShadow);
 
   const towerShade = ctx.createLinearGradient(0, 0, towerWidth, 0);
@@ -135,7 +467,7 @@ const drawCastleProp = (ctx, prop, cam) => {
     { x: width - towerWidth, y: height - towerHeight }
   ];
 
-  for (const pos of towerPositions) {
+  towerPositions.forEach((pos, index) => {
     ctx.fillStyle = towerGradient;
     ctx.fillRect(pos.x, pos.y, towerWidth, towerHeight);
     ctx.save();
@@ -153,20 +485,24 @@ const drawCastleProp = (ctx, prop, cam) => {
       darkenColor(palette.stoneShadow, 0.1)
     );
 
-    const windowWidth = towerWidth * 0.3;
-    const windowHeight = towerWidth * 0.38;
-    const windowX = pos.x + towerWidth * 0.35;
-    let windowY = pos.y + towerHeight * 0.32;
+    const windowWidth = towerWidth * 0.28;
+    const windowHeight = towerWidth * 0.34;
+    const windowX = pos.x + towerWidth * 0.36;
+    let windowY = pos.y + towerHeight * 0.26;
     for (let i = 0; i < 3; i += 1) {
-      drawWindow(windowX, windowY, windowWidth, windowHeight);
-      windowY += windowHeight * 1.25;
+      const theme = towerThemes[(index * 2 + i) % towerThemes.length];
+      drawWindow(windowX, windowY, windowWidth, windowHeight, theme, {
+        bars: false,
+        radius: windowWidth * 0.45
+      });
+      windowY += windowHeight * 1.3;
     }
-  }
+  });
 
-  const hallX = towerWidth;
-  const hallWidth = width - towerWidth * 2;
+  const hallX = towerWidth * 0.9;
+  const hallWidth = width - hallX * 2;
   const hallGradient = ctx.createLinearGradient(0, hallY, 0, hallY + hallHeight);
-  hallGradient.addColorStop(0, lightenColor(palette.stoneLight, 0.18));
+  hallGradient.addColorStop(0, lightenColor(palette.stoneLight, 0.22));
   hallGradient.addColorStop(1, palette.stoneMid);
   ctx.fillStyle = hallGradient;
   ctx.fillRect(hallX, hallY, hallWidth, hallHeight);
@@ -176,7 +512,7 @@ const drawCastleProp = (ctx, prop, cam) => {
     hallY,
     hallWidth,
     battlementHeight,
-    lightenColor(palette.stoneLight, 0.22),
+    lightenColor(palette.stoneLight, 0.25),
     darkenColor(palette.stoneShadow, 0.12)
   );
 
@@ -190,26 +526,27 @@ const drawCastleProp = (ctx, prop, cam) => {
   ctx.fillRect(hallX, hallY, hallWidth, hallHeight);
   ctx.restore();
 
-  const windowRows = 2;
-  const windowCols = 4;
+  const windowRows = 3;
+  const windowCols = 5;
   const windowSpacingX = hallWidth / (windowCols + 1);
-  const windowSpacingY = hallHeight / (windowRows + 2);
-  const hallWindowWidth = windowSpacingX * 0.5;
+  const windowSpacingY = hallHeight / (windowRows + 3);
+  const hallWindowWidth = windowSpacingX * 0.48;
   const hallWindowHeight = windowSpacingY * 0.9;
   for (let row = 0; row < windowRows; row += 1) {
     for (let col = 0; col < windowCols; col += 1) {
       const wx = hallX + windowSpacingX * (col + 1) - hallWindowWidth / 2;
-      const wy = hallY + windowSpacingY * (row + 1);
-      drawWindow(wx, wy, hallWindowWidth, hallWindowHeight);
+      const wy = hallY + windowSpacingY * (row + 1.3);
+      const theme = hallThemes[(row * windowCols + col) % hallThemes.length];
+      drawWindow(wx, wy, hallWindowWidth, hallWindowHeight, theme);
     }
   }
 
-  const keepWidth = hallWidth * 0.38;
-  const keepHeight = hallHeight * 0.82;
+  const keepWidth = hallWidth * 0.4;
+  const keepHeight = hallHeight * 0.86;
   const keepX = hallX + hallWidth / 2 - keepWidth / 2;
   const keepY = hallY - keepHeight * 0.1;
   const keepGradient = ctx.createLinearGradient(0, keepY, 0, keepY + keepHeight);
-  keepGradient.addColorStop(0, lightenColor(palette.stoneLight, 0.22));
+  keepGradient.addColorStop(0, lightenColor(palette.stoneLight, 0.26));
   keepGradient.addColorStop(1, palette.stoneShadow);
   ctx.fillStyle = keepGradient;
   ctx.fillRect(keepX, keepY, keepWidth, keepHeight);
@@ -219,7 +556,7 @@ const drawCastleProp = (ctx, prop, cam) => {
     keepY,
     keepWidth,
     battlementHeight,
-    lightenColor(palette.stoneLight, 0.25),
+    lightenColor(palette.stoneLight, 0.28),
     darkenColor(palette.stoneShadow, 0.1)
   );
 
@@ -233,23 +570,24 @@ const drawCastleProp = (ctx, prop, cam) => {
   ctx.fillRect(keepX, keepY, keepWidth, keepHeight);
   ctx.restore();
 
-  const keepWindowWidth = keepWidth * 0.24;
-  const keepWindowHeight = keepHeight * 0.18;
+  const keepWindowWidth = keepWidth * 0.22;
+  const keepWindowHeight = keepHeight * 0.16;
   const keepWindowX = keepX + keepWidth / 2 - keepWindowWidth / 2;
-  let keepWindowY = keepY + keepHeight * 0.2;
-  for (let i = 0; i < 3; i += 1) {
-    drawWindow(keepWindowX, keepWindowY, keepWindowWidth, keepWindowHeight);
-    keepWindowY += keepWindowHeight * 1.35;
+  let keepWindowY = keepY + keepHeight * 0.18;
+  for (let i = 0; i < keepThemes.length; i += 1) {
+    const theme = keepThemes[i % keepThemes.length];
+    drawWindow(keepWindowX, keepWindowY, keepWindowWidth, keepWindowHeight, theme);
+    keepWindowY += keepWindowHeight * 1.28;
   }
 
-  const roofHeight = battlementHeight * 1.6;
+  const roofHeight = battlementHeight * 1.8;
   const roofGradient = ctx.createLinearGradient(0, keepY - roofHeight, 0, keepY);
   roofGradient.addColorStop(0, lightenColor(palette.roofLight, 0.2));
   roofGradient.addColorStop(1, palette.roofShadow);
   ctx.beginPath();
-  ctx.moveTo(keepX - keepWidth * 0.12, keepY);
+  ctx.moveTo(keepX - keepWidth * 0.14, keepY);
   ctx.lineTo(keepX + keepWidth / 2, keepY - roofHeight);
-  ctx.lineTo(keepX + keepWidth + keepWidth * 0.12, keepY);
+  ctx.lineTo(keepX + keepWidth + keepWidth * 0.14, keepY);
   ctx.closePath();
   ctx.fillStyle = roofGradient;
   ctx.fill();
@@ -261,6 +599,30 @@ const drawCastleProp = (ctx, prop, cam) => {
   const gateHeight = hallHeight * 0.55;
   const gateX = width / 2 - gateWidth / 2;
   const gateY = hallY + hallHeight - gateHeight;
+
+  const lowerWingHeight = hallHeight * 0.26;
+  const lowerWingY = hallY + hallHeight - lowerWingHeight;
+  const lowerWingGradient = ctx.createLinearGradient(0, lowerWingY, 0, lowerWingY + lowerWingHeight);
+  lowerWingGradient.addColorStop(0, lightenColor(palette.stoneLight, 0.12));
+  lowerWingGradient.addColorStop(1, palette.stoneShadow);
+  ctx.fillStyle = lowerWingGradient;
+  ctx.fillRect(hallX, lowerWingY, hallWidth, lowerWingHeight);
+
+  const lowerWindowWidth = hallWindowWidth * 0.82;
+  const lowerWindowHeight = hallWindowHeight * 0.95;
+  const lowerY = lowerWingY + lowerWingHeight * 0.12;
+  for (let col = 0; col < windowCols; col += 1) {
+    if (col === Math.floor(windowCols / 2)) {
+      continue;
+    }
+    const wx = hallX + windowSpacingX * (col + 1) - lowerWindowWidth / 2;
+    const theme = lowerThemes[col % lowerThemes.length];
+    drawWindow(wx, lowerY, lowerWindowWidth, lowerWindowHeight, theme, {
+      bars: true,
+      radius: lowerWindowWidth * 0.35
+    });
+  }
+
   const gateGradient = ctx.createLinearGradient(0, gateY, 0, gateY + gateHeight);
   gateGradient.addColorStop(0, '#4f3a2d');
   gateGradient.addColorStop(1, '#2c211a');
@@ -296,6 +658,10 @@ const drawCastleProp = (ctx, prop, cam) => {
   stepGradient.addColorStop(1, palette.stoneShadow);
   ctx.fillStyle = stepGradient;
   ctx.fillRect(gateX - hallWidth * 0.05, stepY, gateWidth + hallWidth * 0.1, stepHeight);
+
+  const lowerStepHeight = stepHeight * 0.55;
+  ctx.fillStyle = lightenColor(palette.stoneLight, 0.08);
+  ctx.fillRect(gateX - hallWidth * 0.08, stepY + stepHeight * 0.6, gateWidth + hallWidth * 0.16, lowerStepHeight);
 
   const glowGradient = ctx.createRadialGradient(width / 2, gateY + gateHeight, gateWidth * 0.18, width / 2, gateY + gateHeight * 1.05, gateWidth * 1.1);
   glowGradient.addColorStop(0, 'rgba(255, 214, 160, 0.3)');
@@ -769,77 +1135,79 @@ export const RoomLibrary = {
   lordBritishCastle: {
     name: 'Castle Britannia Courtyard',
     terrain: 'Castle Grounds',
-    bounds: { width: 3200, height: 2200 },
-    spawn: { x: 1500, y: 1860 },
+    bounds: { width: 4200, height: 2800 },
+    spawn: { x: 1500, y: 2120 },
     obstacles: [
-      { x: 680, y: 520, w: 90, h: 900, type: 'wall' },
-      { x: 2200, y: 520, w: 90, h: 900, type: 'wall' },
-      { x: 760, y: 520, w: 440, h: 110, type: 'wall' },
-      { x: 1760, y: 520, w: 440, h: 110, type: 'wall' },
-      { x: 760, y: 1180, w: 1440, h: 90, type: 'wall' },
-      { x: 940, y: 700, w: 1100, h: 420, type: 'wall' },
-      { x: 760, y: 640, w: 180, h: 180, type: 'rock' },
-      { x: 2020, y: 640, w: 180, h: 180, type: 'rock' }
+      { x: 520, y: 360, w: 140, h: 1160, type: 'wall' },
+      { x: 2310, y: 360, w: 140, h: 1160, type: 'wall' },
+      { x: 660, y: 360, w: 560, h: 140, type: 'wall' },
+      { x: 1700, y: 360, w: 560, h: 140, type: 'wall' },
+      { x: 860, y: 620, w: 1180, h: 540, type: 'wall' },
+      { x: 660, y: 520, w: 220, h: 220, type: 'rock' },
+      { x: 1980, y: 520, w: 220, h: 220, type: 'rock' },
+      { x: 660, y: 1240, w: 520, h: 120, type: 'wall' },
+      { x: 1680, y: 1240, w: 520, h: 120, type: 'wall' },
+      { x: 960, y: 1100, w: 1020, h: 120, type: 'wall' }
     ],
     props: [
       {
-        x: 760,
-        y: 540,
-        w: 1440,
-        h: 820,
+        x: 570,
+        y: 400,
+        w: 1860,
+        h: 980,
         type: 'castle',
         primaryColor: '#2d4f8f',
         secondaryColor: '#f3cf6b',
         accentColor: '#fef2d0',
-        detail: { gateWidth: 360 }
+        detail: { gateWidth: 420 }
       },
-      { x: 1290, y: 1300, w: 420, h: 520, type: 'causeway' },
+      { x: 1270, y: 1380, w: 460, h: 620, type: 'causeway' },
       {
-        x: 1180,
-        y: 1320,
-        w: 90,
-        h: 260,
+        x: 1080,
+        y: 1360,
+        w: 110,
+        h: 320,
         type: 'banner',
         primaryColor: '#2d4f8f',
         secondaryColor: '#f3cf6b',
         accentColor: '#fef2d0'
       },
       {
-        x: 1720,
-        y: 1320,
-        w: 90,
-        h: 260,
+        x: 1820,
+        y: 1360,
+        w: 110,
+        h: 320,
         type: 'banner',
         primaryColor: '#8d2f2f',
         secondaryColor: '#f3cf6b',
         accentColor: '#fef2d0'
       },
       {
-        x: 820,
-        y: 600,
-        w: 90,
-        h: 260,
+        x: 700,
+        y: 520,
+        w: 100,
+        h: 300,
         type: 'banner',
         primaryColor: '#2d4f8f',
         secondaryColor: '#f3cf6b',
         accentColor: '#fef2d0'
       },
       {
-        x: 2040,
-        y: 600,
-        w: 90,
-        h: 260,
+        x: 2050,
+        y: 520,
+        w: 100,
+        h: 300,
         type: 'banner',
         primaryColor: '#8d2f2f',
         secondaryColor: '#f3cf6b',
         accentColor: '#fef2d0'
       },
-      { x: 1260, y: 1620, w: 90, h: 140, type: 'brazier' },
-      { x: 1730, y: 1620, w: 90, h: 140, type: 'brazier' },
-      { x: 980, y: 1480, w: 140, h: 200, type: 'tree', spriteURL: '/assets/tree.png' },
-      { x: 1820, y: 1480, w: 140, h: 200, type: 'tree', spriteURL: '/assets/tree.png' },
-      { x: 1400, y: 1700, w: 60, h: 60, type: 'lantern', color: '#f6c35f' },
-      { x: 1560, y: 1700, w: 60, h: 60, type: 'lantern', color: '#f6c35f' }
+      { x: 1220, y: 1720, w: 100, h: 160, type: 'brazier' },
+      { x: 1780, y: 1720, w: 100, h: 160, type: 'brazier' },
+      { x: 880, y: 1580, w: 160, h: 220, type: 'tree', spriteURL: '/assets/tree.png' },
+      { x: 1980, y: 1580, w: 160, h: 220, type: 'tree', spriteURL: '/assets/tree.png' },
+      { x: 1400, y: 1880, w: 60, h: 60, type: 'lantern', color: '#f6c35f' },
+      { x: 1600, y: 1880, w: 60, h: 60, type: 'lantern', color: '#f6c35f' }
     ]
   },
   meadow: {
