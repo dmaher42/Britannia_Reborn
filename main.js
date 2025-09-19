@@ -20,7 +20,6 @@ const party = new Party(
   ],
   { followSpacing: 42, collisionRadius: 14 }
 );
-party.placeAt(world.spawn.x, world.spawn.y);
 
 const inventory = new Inventory();
 inventory.gold = 125;
@@ -74,7 +73,7 @@ const ui = setupUI({
 ui.log('The Avatar arrives on the outskirts of Britain.');
 ui.showToast('Welcome back to Britannia.');
 
-const camera = { x: 0, y: 0, width: 0, height: 0 };
+const camera = { x: 0, y: 0, width: 0, height: 0, deadzone: { width: 320, height: 220 } };
 const deviceRatio = Math.min(window.devicePixelRatio || 1, 2);
 
 function resize() {
@@ -84,6 +83,7 @@ function resize() {
   ctx.setTransform(deviceRatio, 0, 0, deviceRatio, 0, 0);
   camera.width = rect.width;
   camera.height = rect.height;
+  updateCamera(true);
 }
 
 function ensureCanvasSize() {
@@ -121,11 +121,37 @@ function updateTerrain(name) {
   }
 }
 
-function updateCamera() {
+function updateCamera(forceCenter = false) {
   const leader = party.leader;
   if (!leader) return;
-  camera.x = leader.x - camera.width / 2;
-  camera.y = leader.y - camera.height / 2;
+  const halfW = camera.width / 2;
+  const halfH = camera.height / 2;
+  const targetX = leader.x;
+  const targetY = leader.y;
+
+  if (forceCenter) {
+    camera.x = targetX - halfW;
+    camera.y = targetY - halfH;
+  } else {
+    const dead = camera.deadzone;
+    const left = camera.x + (camera.width - dead.width) / 2;
+    const right = left + dead.width;
+    const top = camera.y + (camera.height - dead.height) / 2;
+    const bottom = top + dead.height;
+
+    if (targetX < left) {
+      camera.x -= left - targetX;
+    } else if (targetX > right) {
+      camera.x += targetX - right;
+    }
+
+    if (targetY < top) {
+      camera.y -= top - targetY;
+    } else if (targetY > bottom) {
+      camera.y += targetY - bottom;
+    }
+  }
+
   const { width, height } = world.getPixelSize();
   camera.x = clamp(camera.x, 0, Math.max(0, width - camera.width));
   camera.y = clamp(camera.y, 0, Math.max(0, height - camera.height));
@@ -194,6 +220,14 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-requestAnimationFrame(frame);
+async function init() {
+  await world.ready;
+  party.placeAt(world.spawn.x, world.spawn.y);
+  updateCamera(true);
+  lastTime = performance.now();
+  requestAnimationFrame(frame);
+}
+
+init();
 
 window.addEventListener('beforeunload', () => input.destroy());

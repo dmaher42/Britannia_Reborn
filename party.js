@@ -138,17 +138,29 @@ export class Party {
     const stepY = vy * speed * dt;
     const radius = this.collisionRadius;
 
-    if (!world || world.isWalkableCircle(leader.x + stepX, leader.y, radius)) {
-      leader.x += stepX;
-    }
-    if (!world || world.isWalkableCircle(leader.x, leader.y + stepY, radius)) {
-      leader.y += stepY;
-    }
+    if (world && typeof world.resolveMovement === 'function') {
+      const collider = {
+        x: leader.x - radius,
+        y: leader.y - radius,
+        width: radius * 2,
+        height: radius * 2
+      };
+      world.resolveMovement(collider, stepX, stepY);
+      leader.x = collider.x + radius;
+      leader.y = collider.y + radius;
+    } else {
+      if (!world || world.isWalkableCircle(leader.x + stepX, leader.y, radius)) {
+        leader.x += stepX;
+      }
+      if (!world || world.isWalkableCircle(leader.x, leader.y + stepY, radius)) {
+        leader.y += stepY;
+      }
 
-    if (world) {
-      const clamped = world.clampPosition(leader.x, leader.y, radius);
-      leader.x = clamped.x;
-      leader.y = clamped.y;
+      if (world) {
+        const clamped = world.clampPosition(leader.x, leader.y, radius);
+        leader.x = clamped.x;
+        leader.y = clamped.y;
+      }
     }
   }
 
@@ -167,30 +179,43 @@ export class Party {
         const move = Math.min(dist - desired, follower.speed() * dt);
         const nx = dx / dist;
         const ny = dy / dist;
-        let nextX = follower.x + nx * move;
-        let nextY = follower.y + ny * move;
 
-        if (world && !world.isWalkableCircle(nextX, nextY, radius)) {
-          if (world.isWalkableCircle(follower.x + nx * move, follower.y, radius)) {
-            nextX = follower.x + nx * move;
-          } else {
-            nextX = follower.x;
+        if (world && typeof world.resolveMovement === 'function') {
+          const collider = {
+            x: follower.x - radius,
+            y: follower.y - radius,
+            width: radius * 2,
+            height: radius * 2
+          };
+          world.resolveMovement(collider, nx * move, ny * move);
+          follower.x = collider.x + radius;
+          follower.y = collider.y + radius;
+        } else {
+          let nextX = follower.x + nx * move;
+          let nextY = follower.y + ny * move;
+
+          if (world && !world.isWalkableCircle(nextX, nextY, radius)) {
+            if (world.isWalkableCircle(follower.x + nx * move, follower.y, radius)) {
+              nextX = follower.x + nx * move;
+            } else {
+              nextX = follower.x;
+            }
+            if (world.isWalkableCircle(follower.x, follower.y + ny * move, radius)) {
+              nextY = follower.y + ny * move;
+            } else {
+              nextY = follower.y;
+            }
           }
-          if (world.isWalkableCircle(follower.x, follower.y + ny * move, radius)) {
-            nextY = follower.y + ny * move;
-          } else {
-            nextY = follower.y;
+
+          if (world) {
+            const clamped = world.clampPosition(nextX, nextY, radius);
+            nextX = clamped.x;
+            nextY = clamped.y;
           }
-        }
 
-        if (world) {
-          const clamped = world.clampPosition(nextX, nextY, radius);
-          nextX = clamped.x;
-          nextY = clamped.y;
+          follower.x = nextX;
+          follower.y = nextY;
         }
-
-        follower.x = nextX;
-        follower.y = nextY;
       }
     }
   }
