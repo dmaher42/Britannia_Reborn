@@ -46,7 +46,7 @@ inventory.add({ id: 'healing_potion', name: 'Healing Potion', weight: 0.3, qty: 
 party.members[0].addToBackpack({ id: 'bedroll', name: 'Bedroll', weight: 1.2, qty: 1 });
 
 const spellbook = new Spellbook(inventory, party);
-const combat = new CombatSystem(party);
+const combat = new CombatSystem(party, { spellbook });
 const input = new InputController(window);
 
 function getActiveCharacter() {
@@ -170,7 +170,11 @@ const ui = setupUI({
     ui.refreshParty();
   },
   onStartCombat: () => {
-    if (combat.startSkirmish()) {
+    const ambushers = [
+      { id: 'brigand_scout', name: 'Brigand Scout', hp: 18, hpMax: 18, atk: 6, initiative: 13 },
+      { id: 'cutpurse', name: 'Cutpurse', hp: 14, hpMax: 14, atk: 5, initiative: 10 }
+    ];
+    if (combat.startSkirmish(ambushers)) {
       ui.showToast('A skirmish erupts!');
     } else {
       ui.showToast('The skirmish is already underway.');
@@ -186,6 +190,32 @@ const ui = setupUI({
   },
   onEquipItem: handleEquipItem,
   onUseItem: handleUseItem
+});
+
+combat.onEvent((event, payload) => {
+  if (event !== 'complete') return;
+  const victory = !!payload?.victory;
+  const rewards = payload?.rewards ?? { xp: 0, gold: 0 };
+  if (victory) {
+    const logs = [];
+    if (rewards.gold) {
+      inventory.gold = (inventory.gold ?? 0) + rewards.gold;
+      logs.push(`The party recovers ${rewards.gold} gold from the fallen.`);
+    }
+    if (rewards.xp) {
+      party.members.forEach((member) => {
+        member.xp = (member.xp ?? 0) + rewards.xp;
+      });
+      logs.push(`Each companion earns ${rewards.xp} experience.`);
+    }
+    logs.forEach((message) => ui.log(message));
+    if (rewards.gold || rewards.xp) {
+      ui.refreshInventory();
+      ui.refreshParty();
+    }
+  } else {
+    ui.log('The enemy forces the party to retreat and regroup.');
+  }
 });
 
 ui.log('The Avatar steps into the expanded courtyard of Castle Britannia, its new wings bustling with life.');
@@ -338,7 +368,8 @@ async function travelTo(roomId) {
 }
 
 function update(dt) {
-  const direction = input.getDirection();
+  const inCombat = combat.active;
+  const direction = inCombat ? { x: 0, y: 0 } : input.getDirection();
   party.update(dt, world, direction);
   combat.update(dt);
   updateCamera();
@@ -347,7 +378,13 @@ function update(dt) {
   if (leader) {
     const terrain = world.terrainAtWorld(leader.x, leader.y);
     updateTerrain(terrain?.name ?? '-');
-    if (leader.isOverweight()) {
+    if (inCombat) {
+      if (combat.isPlayerTurn()) {
+        updateStatus('A skirmish is underway! Select an action for the party.');
+      } else {
+        updateStatus('Hold fast while the enemy makes their play.');
+      }
+    } else if (leader.isOverweight()) {
       updateStatus(`${leader.name} is slowed by the weight of their gear.`);
     } else if (direction.x !== 0 || direction.y !== 0) {
       updateStatus(`Exploring ${areaName()}...`);
