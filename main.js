@@ -6,6 +6,7 @@ import { CombatSystem } from './combat.js';
 import { InputController } from './controls.js';
 import { setupUI } from './ui.js';
 import { clamp } from './utils.js';
+import { drawCharacterModel } from './character-models.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -70,8 +71,8 @@ const ui = setupUI({
   }
 });
 
-ui.log('The Avatar arrives on the outskirts of Britain.');
-ui.showToast('Welcome back to Britannia.');
+ui.log('The Avatar stands before Castle Britannia, seat of Lord British.');
+ui.showToast("Welcome to the castle keep of Lord British.");
 
 const camera = { x: 0, y: 0, width: 0, height: 0, deadzone: { width: 320, height: 220 } };
 const deviceRatio = Math.min(window.devicePixelRatio || 1, 2);
@@ -170,36 +171,33 @@ function update(dt) {
     if (leader.isOverweight()) {
       updateStatus(`${leader.name} is slowed by the weight of their gear.`);
     } else if (direction.x !== 0 || direction.y !== 0) {
-      updateStatus('Exploring the outskirts of Britain...');
+      updateStatus('Exploring the castle grounds...');
     } else {
-      updateStatus('Use WASD or the arrow keys to explore.');
+      updateStatus('Use WASD or the arrow keys to tour the castle courtyard.');
     }
   }
 }
 
 function drawParty(ctx, party, cam) {
-  const radius = 14;
+  const radius = 19;
   party.members.forEach((member, index) => {
     const sx = member.x - cam.x;
     const sy = member.y - cam.y;
+    drawCharacterModel(ctx, member, {
+      x: sx,
+      y: sy,
+      radius,
+      isLeader: index === party.leaderIndex
+    });
+
     ctx.save();
-    ctx.fillStyle = 'rgba(5, 12, 22, 0.35)';
-    ctx.beginPath();
-    ctx.ellipse(sx, sy + radius * 0.65, radius * 0.9, radius * 0.5, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.beginPath();
-    ctx.fillStyle = index === party.leaderIndex ? '#ffd35f' : '#9ecfff';
-    ctx.strokeStyle = 'rgba(12, 24, 36, 0.85)';
-    ctx.lineWidth = 2;
-    ctx.arc(sx, sy, radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.fillStyle = '#0b1728';
     ctx.font = '12px "Inter", system-ui';
     ctx.textAlign = 'center';
-    ctx.fillText(member.name, sx, sy - radius - 6);
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.lineWidth = 3;
+    ctx.strokeText(member.name, sx, sy - radius * 1.55);
+    ctx.fillStyle = '#f6edd6';
+    ctx.fillText(member.name, sx, sy - radius * 1.55);
     ctx.restore();
   });
 }
