@@ -97,6 +97,49 @@ canvas#game {
   letter-spacing: 0.02em;
 }
 
+.panel.travel {
+  display: grid;
+  gap: 8px;
+}
+
+.travel-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #9abef7;
+}
+
+.panel.travel select {
+  width: 100%;
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: rgba(14, 26, 42, 0.85);
+  border: 1px solid rgba(118, 158, 220, 0.25);
+  color: #e9f3ff;
+  font-size: 14px;
+}
+
+.panel.travel select:focus {
+  outline: none;
+  border-color: rgba(148, 188, 255, 0.65);
+  box-shadow: 0 0 0 1px rgba(148, 188, 255, 0.35);
+}
+
+.panel.travel select:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.panel.travel button {
+  width: 100%;
+}
+
+.travel-hint {
+  margin: 0;
+  font-size: 12px;
+  color: #8fa4c6;
+  line-height: 1.4;
+}
+
 .party-list {
   list-style: none;
   margin: 0;
