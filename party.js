@@ -2,6 +2,7 @@ import { clamp } from './utils.js';
 
 export const CharacterClass = Object.freeze({
   Avatar: 'Avatar',
+  LordBritish: 'LordBritish',
   Fighter: 'Fighter',
   Bard: 'Bard',
   Ranger: 'Ranger',
@@ -13,6 +14,7 @@ export const CharacterClass = Object.freeze({
 
 const MP_RULES = {
   [CharacterClass.Avatar]: (INT) => INT * 2,
+  [CharacterClass.LordBritish]: (INT) => INT * 2,
   [CharacterClass.Bard]: (INT) => Math.floor(INT / 2),
   [CharacterClass.Ranger]: (INT) => Math.floor(INT / 2)
 };
