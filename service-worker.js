@@ -1,170 +1,55 @@
-const SCRIPT_VERSION = new URL(self.location).searchParams.get('v') || 'static';
-const CACHE_NAME = `br-cache-${SCRIPT_VERSION}`;
+const CACHE_NAME = 'britannia-reborn-v1';
 const PRECACHE_URLS = [
   './',
   './index.html',
+  './style.css',
   './main.js',
   './world.js',
   './party.js',
   './inventory.js',
   './spells.js',
   './combat.js',
+  './controls.js',
   './ui.js',
-  './ai.js',
-  './selection.js',
-  './style.css',
-  './renderer.js',
-  './world3d.js',
-  './controls.js'
+  './utils.js',
+  './selection.js'
 ];
 
-const isSameOrigin = (url) => {
-  try {
-    return new URL(url).origin === self.location.origin;
-  } catch {
-    return false;
-  }
-};
-
-const canCacheResponse = (response) => response && response.ok && ['basic', 'cors'].includes(response.type);
-
-async function cachePutSafe(cache, request, response) {
-  if (!response || !canCacheResponse(response)) return;
-  try {
-    await cache.put(request, response.clone());
-  } catch (err) {
-    console.warn('[SW] Failed to update cache for', request.url, err);
-  }
-}
-
 self.addEventListener('install', (event) => {
-  event.waitUntil((async () => {
-    const cache = await caches.open(CACHE_NAME);
-    try {
-      await cache.addAll(PRECACHE_URLS.map((url) => new Request(url, { cache: 'reload' })));
-    } catch (err) {
-      console.warn('[SW] Failed to precache some assets', err);
-    }
-    await self.skipWaiting();
-  })());
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS)).then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil((async () => {
-    const names = await caches.keys();
-    await Promise.all(names.filter((name) => name !== CACHE_NAME).map((name) => caches.delete(name)));
-    await self.clients.claim();
-  })());
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((name) => name !== CACHE_NAME).map((name) => caches.delete(name)))
+    ).then(() => self.clients.claim())
+  );
 });
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-  if (request.method !== 'GET' || !isSameOrigin(request.url)) return;
+  if (request.method !== 'GET') return;
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
 
-  event.respondWith((async () => {
-    let response;
-    try {
-      if (request.mode === 'navigate') {
-        response = await handleNavigationRequest(request);
-      } else {
-        response = await handleAssetRequest(request);
-      }
-    } catch (err) {
-      console.warn('[SW] Falling back after fetch handler failure', request.url, err);
-      try {
-        response = await respondWithFallback(request);
-      } catch (fallbackError) {
-        console.error('[SW] Fallback handler failed', request.url, fallbackError);
-      }
-    }
-
-    if (!(response instanceof Response)) {
-      console.error('[SW] Fetch handler returned a non-Response value; serving error response instead', request.url, response);
-      return new Response('Service worker error', {
-        status: 503,
-        statusText: 'Service Worker Error',
-        headers: { 'Content-Type': 'text/plain' }
-      });
-    }
-
-    return response;
-  })());
-});
-
-async function handleNavigationRequest(request) {
-  const cache = await caches.open(CACHE_NAME);
-  try {
-    const response = await fetch(request, { cache: 'no-store' });
-    await cachePutSafe(cache, request, response);
-    return response;
-  } catch (err) {
-    const fallback = (await cache.match(request)) || (await cache.match('./index.html'));
-    if (fallback) {
-      return fallback;
-    }
-    return new Response('Offline', {
-      status: 503,
-      statusText: 'Offline',
-      headers: { 'Content-Type': 'text/plain' }
-    });
-  }
-}
-
-async function handleAssetRequest(request) {
-  const cache = await caches.open(CACHE_NAME);
-  const cached = await cache.match(request);
-  if (cached) {
-    fetch(request).then((response) => cachePutSafe(cache, request, response)).catch((err) => {
-      console.warn('[SW] Failed to refresh cached asset', request.url, err);
-    });
-    return cached;
-  }
-
-  try {
-    const response = await fetch(request);
-    await cachePutSafe(cache, request, response);
-    return response;
-  } catch (err) {
-    console.warn('[SW] Network request failed; attempting cache fallback', request.url, err);
-    return respondWithFallback(request);
-  }
-}
-
-async function respondWithFallback(request) {
-  let cache;
-  try {
-    cache = await caches.open(CACHE_NAME);
-  } catch (err) {
-    console.warn('[SW] Failed to open cache during fallback', err);
-  }
-
-  if (request.mode === 'navigate') {
-    if (cache) {
-      const cached = (await cache.match(request)) || (await cache.match('./index.html'));
+  event.respondWith(
+    caches.open(CACHE_NAME).then(async (cache) => {
+      const cached = await cache.match(request);
       if (cached) {
         return cached;
       }
-    }
-    return new Response('Offline', {
-      status: 503,
-      statusText: 'Offline',
-      headers: { 'Content-Type': 'text/plain' }
-    });
-  }
-
-  if (cache) {
-    const cached = await cache.match(request);
-    if (cached) {
-      return cached;
-    }
-  }
-
-  return new Response('', {
-    status: 503,
-    statusText: 'Service Unavailable'
-  });
-}
-
-self.addEventListener('message', (event) => {
-  if (event.data === 'SKIP_WAITING') self.skipWaiting();
+      try {
+        const response = await fetch(request);
+        if (response && response.ok) {
+          cache.put(request, response.clone());
+        }
+        return response;
+      } catch (error) {
+        return cached || Response.error();
+      }
+    })
+  );
 });

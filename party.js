@@ -1,165 +1,197 @@
-import { TILE } from './world.js';
+import { clamp } from './utils.js';
 
-export const CharacterClass = {
-  Avatar:'Avatar', Bard:'Bard', Ranger:'Ranger',
-  Fighter:'Fighter', Mage:'Mage', Druid:'Druid', Tinker:'Tinker', Paladin:'Paladin'
+export const CharacterClass = Object.freeze({
+  Avatar: 'Avatar',
+  Fighter: 'Fighter',
+  Bard: 'Bard',
+  Ranger: 'Ranger',
+  Mage: 'Mage',
+  Druid: 'Druid',
+  Tinker: 'Tinker',
+  Shepherd: 'Shepherd'
+});
+
+const MP_RULES = {
+  [CharacterClass.Avatar]: (INT) => INT * 2,
+  [CharacterClass.Bard]: (INT) => Math.floor(INT / 2),
+  [CharacterClass.Ranger]: (INT) => Math.floor(INT / 2)
+};
+
+const EQUIP_SLOTS = ['head', 'torso', 'hands', 'weapon', 'shield', 'ring'];
+
+const weightOf = (item) => {
+  if (!item) return 0;
+  const qty = typeof item.qty === 'number' ? item.qty : 1;
+  const weight = typeof item.weight === 'number' ? item.weight : 0;
+  return weight * qty;
 };
 
 export class Character {
-  constructor({name, cls, STR, DEX, INT, hpMax=20}){
-    this.name=name; this.cls=cls;
-    this.STR=STR; this.DEX=DEX; this.INT=INT;
-    this.hpMax=hpMax; this.hp=hpMax;
-    this.mpMax=this.computeMPMax(); this.mp=this.mpMax;
-    this.baseSpeed=240;
-    this.poisoned=false; this.poisonTurns=0;
-    this.x=0; this.y=0; this.step=0; this.lastAng=0;
-    // Equipment slots: torso, head, weapon, etc.
-    this.equipment = {
-      torso: null,
-      head: null,
-      weapon: null,
-      shield: null,
-      // Add more slots as needed
-    };
+  constructor(options = {}) {
+    this.name = options.name ?? 'Adventurer';
+    this.cls = options.cls ?? CharacterClass.Avatar;
+    this.STR = options.STR ?? 8;
+    this.DEX = options.DEX ?? 8;
+    this.INT = options.INT ?? 8;
+    this.hpMax = typeof options.hpMax === 'number' ? options.hpMax : 20 + this.STR;
+    this.mpMax = this._computeMpMax();
+    this.hp = clamp(options.hp ?? this.hpMax, 0, this.hpMax);
+    this.mp = clamp(options.mp ?? this.mpMax, 0, this.mpMax);
+    this.baseSpeed = options.baseSpeed ?? 96;
+    this.x = options.x ?? 0;
+    this.y = options.y ?? 0;
+    this.equipment = {};
+    EQUIP_SLOTS.forEach((slot) => {
+      this.equipment[slot] = null;
+    });
     this.backpack = [];
   }
-  computeMPMax(){
-    if(this.cls===CharacterClass.Avatar) return this.INT*2;
-    if(this.cls===CharacterClass.Bard || this.cls===CharacterClass.Ranger) return Math.floor(this.INT/2);
-    return 0;
+
+  _computeMpMax() {
+    const rule = MP_RULES[this.cls];
+    if (!rule) return 0;
+    const mp = rule(this.INT);
+    return Math.max(0, Math.floor(mp));
   }
+
   equippedWeight() {
-    // Sum weights of equipped items
-    return Object.values(this.equipment).reduce((sum, item) => sum + (item?.weight || 0), 0);
+    return EQUIP_SLOTS.reduce((total, slot) => total + weightOf(this.equipment[slot]), 0);
   }
+
   backpackWeight() {
-    return this.backpack.reduce((sum, item) => sum + (item.weight || 0) * (item.qty || 1), 0);
+    return this.backpack.reduce((total, item) => total + weightOf(item), 0);
   }
-  canEquip(item) {
-    // Check if item can be equipped (weight, restrictions)
-    if (item.restricted && item.restricted.includes(this.cls)) return false;
-    const slot = item.equip;
-    if (!slot || !this.equipment.hasOwnProperty(slot)) return false;
-    const newWeight = this.equippedWeight() - (this.equipment[slot]?.weight || 0) + (item.weight || 0);
-    return newWeight <= this.STR;
-  }
+
   equip(item) {
+    if (!item || !item.equip) return false;
     const slot = item.equip;
-    if (this.canEquip(item)) {
-      this.equipment[slot] = item;
-      return true;
-    }
-    return false;
+    if (!Object.prototype.hasOwnProperty.call(this.equipment, slot)) return false;
+    const itemWeight = weightOf(item);
+    const currentWeight = weightOf(this.equipment[slot]);
+    const newTotal = this.equippedWeight() - currentWeight + itemWeight;
+    if (newTotal > this.STR) return false;
+    this.equipment[slot] = { ...item };
+    return true;
   }
-  unequip(slot) {
-    this.equipment[slot] = null;
-  }
-  packLimit() { return this.STR * 2; }
-  canCarry(item) {
-    // Check if item can be added to backpack
-    const newWeight = this.backpackWeight() + (item.weight || 0) * (item.qty || 1);
-    return newWeight <= this.packLimit();
-  }
+
   addToBackpack(item) {
-    if (this.canCarry(item)) {
-      const ex = this.backpack.find(x => x.id === item.id);
-      if (ex) ex.qty = (ex.qty || 0) + (item.qty || 1);
-      else this.backpack.push({ ...item, qty: item.qty || 1 });
-      return true;
-    }
-    return false;
+    if (!item) return false;
+    const itemWeight = weightOf(item);
+    if (this.backpackWeight() + itemWeight > this.STR * 2) return false;
+    this.backpack.push({ ...item });
+    return true;
   }
+
   isOverweight() {
-    return this.equippedWeight() > this.STR || this.backpackWeight() > this.packLimit();
+    return this.equippedWeight() > this.STR || this.backpackWeight() > this.STR * 2;
   }
+
   speed() {
-    return this.baseSpeed * (this.isOverweight() ? 0.6 : 1);
-  }
-  applyPoison(turns){ this.poisoned=true; this.poisonTurns=Math.min(5, (this.poisonTurns||0)+turns); }
-  tick(dt){
-    if(this.poisoned && Math.random()<0.015){ this.hp = Math.max(0, this.hp-1); }
-    // Optionally: penalize movement if overweight
-  }
-  draw(ctx, view, palette={base:'#f0e0c8',hair:'#d9b36c',armor:'#2c3f57',trim:'#9ec3ff',cloak:'#17324f',blade:'#cfd8e6',boot:'#203041'}, hood=false){
-    // nudge palette for visibility on dark tiles
-    const visPalette = Object.assign({}, palette, {
-      base: palette.base || '#f2e6cf',
-      hair: palette.hair || '#e0c87a',
-      armor: palette.armor || '#344a5b',
-      cloak: palette.cloak || '#1f3a55'
-    });
-    palette = visPalette;
-    const {camX, camY}=view;
-    const sx = this.x - camX, sy = this.y - camY;
-    const bob = Math.sin(this.step*0.22)*1.6;
-    // subtle halo to separate character from dark ground
-    try{
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      const haloGrad = ctx.createRadialGradient(sx, sy-6, 4, sx, sy-6, 18);
-      haloGrad.addColorStop(0, 'rgba(140,200,255,0.08)');
-      haloGrad.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = haloGrad;
-      ctx.beginPath(); ctx.arc(sx, sy-6, 18, 0, Math.PI*2); ctx.fill();
-      ctx.restore();
-    }catch(e){/* ignore halo failures */}
-    ctx.save();
-    ctx.globalAlpha=.4; ctx.fillStyle='#000';
-    ctx.beginPath(); ctx.ellipse(sx, sy+12, 16, 8, 0, 0, Math.PI*2); ctx.fill();
-    ctx.restore();
-    ctx.save();
-    ctx.translate(sx, sy+bob);
-    ctx.save(); ctx.fillStyle=palette.cloak; ctx.globalAlpha=.95;
-    ctx.beginPath(); ctx.moveTo(-9,-10);
-    ctx.bezierCurveTo(-16,6+Math.sin(this.step*0.5)*2,-4,14,0,18);
-    ctx.bezierCurveTo(8,12-Math.sin(this.step*0.5)*2,16,4,9,-10);
-    ctx.closePath(); ctx.fill(); ctx.restore();
-    const w1=Math.sin(this.step*0.5), w2=Math.sin(this.step*0.5+Math.PI);
-    const rr=(x,y,w,h,r)=>{ const k=Math.min(r,Math.min(w,h)/2); ctx.beginPath(); ctx.moveTo(x+k,y); ctx.arcTo(x+w,y,x+w,y+h,k); ctx.arcTo(x+w,y+h,x,y+h,k); ctx.arcTo(x,y+h,x,y,k); ctx.arcTo(x,y,x+w,y,k); ctx.closePath(); };
-    ctx.save(); ctx.translate(0,8); ctx.fillStyle=palette.boot;
-    ctx.save(); ctx.rotate(w1*0.25); rr(-6,-2,5,14,2); ctx.fill(); ctx.restore();
-    ctx.save(); ctx.rotate(w2*0.25); rr(1,-2,5,14,2); ctx.fill(); ctx.restore();
-    ctx.restore();
-    ctx.save(); ctx.fillStyle=palette.armor; ctx.strokeStyle=palette.trim; ctx.lineWidth=1.6;
-    rr(-8,-14,16,20,5); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(0,-14); ctx.lineTo(0,6); ctx.stroke();
-    ctx.restore();
-    ctx.save();
-    ctx.save(); ctx.translate(-8,-10); ctx.rotate(w1*0.35); rr(-2,0,4,12,2); ctx.fillStyle=palette.armor; ctx.fill(); ctx.restore();
-    ctx.save(); ctx.translate(8,-10); ctx.rotate(w2*0.45); rr(-2,0,4,12,2); ctx.fillStyle=palette.armor; ctx.fill();
-    ctx.save(); ctx.translate(1,10); ctx.rotate(this.lastAng); ctx.fillStyle=palette.blade; rr(0,-2,20,4,2); ctx.fill();
-    ctx.restore(); ctx.restore();
-    ctx.save(); ctx.translate(0,-18);
-    ctx.fillStyle=palette.base; rr(-2,2,4,4,2); ctx.fill();
-    ctx.beginPath(); ctx.arc(0,0,7,0,Math.PI*2); ctx.fillStyle=palette.base; ctx.fill();
-    if(hood){ ctx.fillStyle='#1b1313'; ctx.globalAlpha=.95; ctx.beginPath(); ctx.arc(0,0,8,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1; }
-    else { ctx.fillStyle=palette.hair; ctx.beginPath(); ctx.arc(-1,-2,7, Math.PI*0.1, Math.PI*0.95); ctx.fill(); }
-    ctx.globalAlpha=.08; ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(-2,-2,5,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1;
-    ctx.restore();
-    ctx.restore();
+    return this.isOverweight() ? this.baseSpeed * 0.6 : this.baseSpeed;
   }
 }
 
 export class Party {
-  constructor(membersData=[]){
-    this.members = membersData.map(d=>new Character(d));
-    this.leader = this.members[0];
-    this.karma = 0;
-    this.activeQuests = [];
-    this.members.forEach((m,i)=>{ m.x = i*10; m.y = i*6; });
+  constructor(members = [], options = {}) {
+    this.members = members.map((member) => (member instanceof Character ? member : new Character(member)));
+    this.leaderIndex = 0;
+    this.followSpacing = options.followSpacing ?? 36;
+    this.collisionRadius = options.collisionRadius ?? 14;
   }
-  get size(){ return this.members.length; }
-  move(dx,dy){
-    for(const m of this.members){
-      m.x += dx; m.y += dy; m.step += Math.hypot(dx,dy)*0.5/TILE;
-      if(dx||dy) m.lastAng = Math.atan2(dy, dx);
-      m.tick(1/60);
+
+  get size() {
+    return this.members.length;
+  }
+
+  get leader() {
+    return this.members[this.leaderIndex] ?? null;
+  }
+
+  setLeader(index) {
+    if (index >= 0 && index < this.members.length) {
+      this.leaderIndex = index;
     }
   }
-  acceptQuest(q){ if(!this.activeQuests.find(x=>x.id===q.id)) this.activeQuests.push(q); }
-  draw(ctx, view){
-    this.members.slice(1).forEach(m=> m.draw(ctx, view, undefined, false));
-    this.leader.draw(ctx, view, undefined, false);
+
+  placeAt(x, y) {
+    if (!this.leader) return;
+    this.members.forEach((member, index) => {
+      member.x = x - index * (this.followSpacing * 0.8);
+      member.y = y + index * 6;
+    });
+  }
+
+  update(dt, world, direction = { x: 0, y: 0 }) {
+    this.moveLeader(dt, world, direction);
+    this.followMembers(dt, world);
+  }
+
+  moveLeader(dt, world, direction = { x: 0, y: 0 }) {
+    const leader = this.leader;
+    if (!leader) return;
+    const speed = leader.speed();
+    const vx = direction.x ?? 0;
+    const vy = direction.y ?? 0;
+    if (vx === 0 && vy === 0) return;
+
+    const stepX = vx * speed * dt;
+    const stepY = vy * speed * dt;
+    const radius = this.collisionRadius;
+
+    if (!world || world.isWalkableCircle(leader.x + stepX, leader.y, radius)) {
+      leader.x += stepX;
+    }
+    if (!world || world.isWalkableCircle(leader.x, leader.y + stepY, radius)) {
+      leader.y += stepY;
+    }
+
+    if (world) {
+      const clamped = world.clampPosition(leader.x, leader.y, radius);
+      leader.x = clamped.x;
+      leader.y = clamped.y;
+    }
+  }
+
+  followMembers(dt, world) {
+    const radius = this.collisionRadius;
+    for (let i = 1; i < this.members.length; i += 1) {
+      const prev = this.members[i - 1];
+      const follower = this.members[i];
+      const dx = prev.x - follower.x;
+      const dy = prev.y - follower.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist < 1e-3) continue;
+
+      const desired = this.followSpacing;
+      if (dist > desired) {
+        const move = Math.min(dist - desired, follower.speed() * dt);
+        const nx = dx / dist;
+        const ny = dy / dist;
+        let nextX = follower.x + nx * move;
+        let nextY = follower.y + ny * move;
+
+        if (world && !world.isWalkableCircle(nextX, nextY, radius)) {
+          if (world.isWalkableCircle(follower.x + nx * move, follower.y, radius)) {
+            nextX = follower.x + nx * move;
+          } else {
+            nextX = follower.x;
+          }
+          if (world.isWalkableCircle(follower.x, follower.y + ny * move, radius)) {
+            nextY = follower.y + ny * move;
+          } else {
+            nextY = follower.y;
+          }
+        }
+
+        if (world) {
+          const clamped = world.clampPosition(nextX, nextY, radius);
+          nextX = clamped.x;
+          nextY = clamped.y;
+        }
+
+        follower.x = nextX;
+        follower.y = nextY;
+      }
+    }
   }
 }

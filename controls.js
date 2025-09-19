@@ -1,46 +1,70 @@
-import { moveHeroToTile, getHeroWorldPos } from './world3d.js';
+const KEY_BINDINGS = {
+  left: ['ArrowLeft', 'a', 'A'],
+  right: ['ArrowRight', 'd', 'D'],
+  up: ['ArrowUp', 'w', 'W'],
+  down: ['ArrowDown', 's', 'S']
+};
 
-const keys = Object.create(null);
-let bounds = { width:32, depth:32 };
-let cameraRig = null;
-let moveCooldown = 0;
+const KEYBOARD_EVENTS = ['keydown', 'keyup'];
 
-export function initControls(opts={}){
-  bounds.width = opts.width || bounds.width;
-  bounds.depth = opts.depth || bounds.depth;
-  cameraRig = opts.cameraRig || null;
-
-  window.addEventListener('keydown', e=>{ keys[e.key] = true; });
-  window.addEventListener('keyup', e=>{ keys[e.key] = false; });
-}
-
-function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
-
-export function updateControls(dt){
-  moveCooldown -= dt;
-  const pos = getHeroWorldPos();
-  let tx = Math.floor(pos.x);
-  let tz = Math.floor(pos.z);
-  let moved = false;
-
-  if(moveCooldown<=0){
-    if(keys['w'] || keys['ArrowUp']){ tz -=1; moved=true; }
-    else if(keys['s'] || keys['ArrowDown']){ tz +=1; moved=true; }
-    else if(keys['a'] || keys['ArrowLeft']){ tx -=1; moved=true; }
-    else if(keys['d'] || keys['ArrowRight']){ tx +=1; moved=true; }
-    if(moved){
-      tx = clamp(tx,0,bounds.width-1);
-      tz = clamp(tz,0,bounds.depth-1);
-      moveHeroToTile(tx, tz);
-      moveCooldown = 0.2; // seconds between steps
-    }
+export class InputController {
+  constructor(target = window) {
+    this.target = target;
+    this.keys = new Set();
+    this._handlers = new Map();
+    this._install();
   }
 
-  if(keys['Shift']){
-    const rotSpeed = 1.5 * dt;
-    if(keys['ArrowLeft']) cameraRig.rotation.y += rotSpeed;
-    if(keys['ArrowRight']) cameraRig.rotation.y -= rotSpeed;
-    if(keys['ArrowUp']) cameraRig.rotation.x += rotSpeed;
-    if(keys['ArrowDown']) cameraRig.rotation.x -= rotSpeed;
+  _install() {
+    KEYBOARD_EVENTS.forEach((type) => {
+      const handler = (event) => {
+        if (event.type === 'keydown') {
+          this.keys.add(event.key);
+          if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(event.key)) {
+            event.preventDefault();
+          }
+        } else if (event.type === 'keyup') {
+          this.keys.delete(event.key);
+        }
+      };
+      this._handlers.set(type, handler);
+      this.target.addEventListener(type, handler);
+    });
+  }
+
+  destroy() {
+    KEYBOARD_EVENTS.forEach((type) => {
+      const handler = this._handlers.get(type);
+      if (handler) {
+        this.target.removeEventListener(type, handler);
+      }
+    });
+    this._handlers.clear();
+    this.keys.clear();
+  }
+
+  isKeyDown(key) {
+    return this.keys.has(key);
+  }
+
+  getDirection() {
+    let dx = 0;
+    let dy = 0;
+
+    if (this._anyDown(KEY_BINDINGS.left)) dx -= 1;
+    if (this._anyDown(KEY_BINDINGS.right)) dx += 1;
+    if (this._anyDown(KEY_BINDINGS.up)) dy -= 1;
+    if (this._anyDown(KEY_BINDINGS.down)) dy += 1;
+
+    if (dx === 0 && dy === 0) {
+      return { x: 0, y: 0 };
+    }
+
+    const length = Math.hypot(dx, dy) || 1;
+    return { x: dx / length, y: dy / length };
+  }
+
+  _anyDown(keys) {
+    return keys.some((key) => this.keys.has(key));
   }
 }

@@ -1,18 +1,26 @@
-# Project: Britannia Reborn
+# Britannia Reborn
 
-A modern, browser‑based reimagining of classic Britannia with an AI‑driven narrative.
+A fresh, from-the-ground-up prototype of a top-down Britannia adventure. Movement, party management, and reagent-driven magic have
+been rebuilt with clarity and testable rules.
 
-## Quick Start
-- Open `index.html` directly in your browser (or the GitHub Pages URL).
-- Click the game once to focus (if needed), then use WASD or the Arrow keys to move. Hold **Shift** + Arrow to look around.
-## Troubleshooting
-If movement does not work (blank or stuck):
-- Ensure the game canvas is focused (click once if needed).
-- Check for blocked key listeners (should be attached to window).
-- Exiting combat/skirmish should re-enable movement.
+## Quick start
+- Open `index.html` in any modern browser.
+- Click the canvas once if keyboard input is not captured.
+- Explore with **WASD** or the arrow keys. The camera now eases around the party leader.
 
-## Using Codex
-- Connect your GitHub to Codex in ChatGPT.
-- Open an issue and tag **@codex** with a task (e.g., “Implement equipment slots and tests”).
+## Systems in this slice
+- **Party trail:** the Avatar leads while companions follow with smoothed spacing.
+- **Encumbrance rules:** equipment must weigh ≤ STR and backpacks ≤ STR×2. Overweight heroes move slower.
+- **Spellcasting:** Fire Dart consumes Sulfur Ash + Black Pearl and MP.
+- **Skirmish stub:** trigger a lightweight combat loop to test turn transitions.
+- **UI panels:** party vitals, carry limits, and shared inventory totals update live.
 
-See **AGENTS.md** for the roadmap.
+## Developing
+Install dependencies and run tests with [Vitest](https://vitest.dev/):
+
+```bash
+npm ci
+npx vitest run
+```
+
+No build step is required—everything runs from ES modules.

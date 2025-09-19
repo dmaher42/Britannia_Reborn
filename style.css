@@ -1,46 +1,260 @@
-:root{
-  --bg:#070c16; --panel:#0d162c; --panel2:#0b1326; --border:#22324d;
-  --text:#eaf0f7; --muted:#9fb0c9; --accent:#8fd3ff;
-  --ring:#53c8ff55; --shadow: 0 30px 80px rgba(0,0,0,.55),0 8px 30px rgba(0,0,0,.35);
+:root {
+  color-scheme: dark;
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background: radial-gradient(circle at top, #152a47 0%, #080f1c 55%, #050910 100%);
+  color: #f0f6ff;
 }
-html,body{height:100%;margin:0;background:radial-gradient(1200px 800px at 70% -10%, #0e1c33 0%, #0b1326 45%, var(--bg) 100% );color:var(--text);font-family:Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial}
-#root{height:100%}
-.canvas-layer{position:absolute;inset:0}
-canvas{display:block;position:absolute;inset:0}
-<<<<<<< HEAD
-#game,#hud,#ui{position:absolute;z-index:10;top:0;left:0}
-#focusOverlay{position:absolute;top:32px;left:50%;transform:translateX(-50%);padding:8px 16px;border-radius:12px;background:rgba(7,12,22,0.85);color:#fff;font-size:14px;display:none;pointer-events:none;z-index:20;white-space:nowrap;box-shadow:0 12px 32px rgba(0,0,0,0.35)}
-#focusOverlay.visible{display:block}
-=======
-/* Explicit stacking order to ensure HUD and overlays appear above canvases */
-#sky{z-index:0}
-#back{z-index:1}
-#game{z-index:2}
-#fx{z-index:3}
-.gridOverlay{z-index:4}
-.vignette{z-index:5}
-.hud{z-index:10}
-.dialogue{z-index:20}
-.toast{z-index:21}
-.watermark{z-index:30}
->>>>>>> ci/add-vitest-workflow
-.vignette{position:absolute;inset:0;pointer-events:none;background:
-  radial-gradient(1200px 800px at 50% 30%, #0000 0%, #0000 55%, rgba(0,0,0,.28) 85%, rgba(0,0,0,.6) 100%)}
-.hud{position:absolute;inset:0;pointer-events:none}
-.topbar{position:absolute;top:12px;left:12px;right:12px;display:flex;gap:10px;justify-content:space-between;align-items:center;pointer-events:auto}
-.btn{background:linear-gradient(180deg,#14253a,#0e1a2a);border:1px solid var(--border);padding:10px 16px;border-radius:12px;cursor:pointer;color:var(--text);box-shadow:inset 0 1px 0 #2a425b66, 0 6px 16px #00000055;transition:filter .15s, transform .06s}
-.btn:hover{filter:brightness(1.15)}
-.btn:active{transform:translateY(1px)}
-.pill{padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:linear-gradient(180deg,#0c1727,#0a1522);}
-.panel{position:absolute;bottom:12px;left:12px;display:flex;gap:12px;pointer-events:auto}
-.card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--border);border-radius:14px;padding:14px;min-width:260px;box-shadow:var(--shadow);backdrop-filter: blur(6px)}
-.card h3{margin:0 0 10px 0;font-size:14px;color:var(--accent);letter-spacing:.3px}
-.row{display:flex;justify-content:space-between;gap:8px;align-items:center;margin:6px 0}
-.dialogue{position:absolute;right:12px;bottom:12px;width:420px;max-height:56vh;overflow:auto;pointer-events:auto}
-.dialogue .bubble{background:linear-gradient(180deg,#0f2036,#0c1830);border:1px solid var(--border);border-radius:14px;padding:12px;margin:0 0 10px 0;box-shadow:var(--shadow);animation:pop .18s ease}
-.dialogue .who{font-weight:700;color:var(--accent);font-size:13px;margin-bottom:4px}
-.dialogue .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
-.toast{position:absolute;left:50%;transform:translateX(-50%);top:12px;background:#0a182a;border:1px solid var(--border);padding:8px 12px;border-radius:10px;box-shadow:var(--shadow);pointer-events:auto}
-.gridOverlay{position:absolute;inset:0;pointer-events:none}
-.watermark{position:absolute;right:12px;top:12px;font-size:12px;opacity:.7}
-.glow{box-shadow:0 0 0 2px var(--ring), inset 0 0 22px #39c2ff33}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+}
+
+.layout {
+  display: flex;
+  flex: 1;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px;
+  gap: 16px;
+}
+
+.playfield {
+  position: relative;
+  flex: 1 1 auto;
+  background: linear-gradient(135deg, rgba(12, 27, 44, 0.95), rgba(8, 16, 28, 0.95));
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+}
+
+canvas#game {
+  width: 100%;
+  height: 100%;
+  display: block;
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
+}
+
+.overlay {
+  position: absolute;
+  inset: 16px;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.status {
+  align-self: flex-start;
+  background: rgba(8, 22, 44, 0.75);
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-size: 14px;
+  letter-spacing: 0.01em;
+  color: #9cc9ff;
+}
+
+.terrain {
+  align-self: flex-end;
+  background: rgba(9, 15, 25, 0.8);
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  color: #c9e6ff;
+}
+
+.sidebar {
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.panel {
+  background: rgba(6, 12, 22, 0.78);
+  border-radius: 18px;
+  padding: 16px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
+}
+
+.panel header {
+  margin-bottom: 12px;
+}
+
+.panel h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.party-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.party-entry {
+  padding: 12px;
+  border-radius: 14px;
+  background: linear-gradient(145deg, rgba(18, 33, 52, 0.9), rgba(12, 24, 40, 0.75));
+  border: 1px solid rgba(100, 160, 255, 0.12);
+  display: grid;
+  gap: 4px;
+}
+
+.party-entry.leader {
+  border-color: rgba(255, 213, 96, 0.45);
+  box-shadow: 0 0 0 1px rgba(255, 213, 96, 0.25);
+}
+
+.party-entry .header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.party-entry .class {
+  color: #8db1ff;
+  font-size: 13px;
+}
+
+.party-entry .stats,
+.party-entry .carry,
+.party-entry .speed {
+  font-size: 12px;
+  display: flex;
+  justify-content: space-between;
+  color: #9ab4d9;
+}
+
+.party-entry .speed.overweight {
+  color: #ffb37a;
+}
+
+.inventory-meta {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  color: #a0bbd9;
+}
+
+.inventory-meta div {
+  display: flex;
+  justify-content: space-between;
+}
+
+.inventory-list {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.inventory-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(16, 32, 48, 0.65);
+  border: 1px solid rgba(118, 158, 220, 0.12);
+}
+
+.actions .button-row {
+  display: grid;
+  gap: 8px;
+}
+
+button {
+  appearance: none;
+  border: none;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  background: linear-gradient(135deg, #264c80, #1b3b66);
+  color: #e9f3ff;
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 18px rgba(0, 0, 0, 0.3);
+}
+
+button:active {
+  transform: translateY(0);
+  filter: brightness(0.95);
+}
+
+.log {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.log-entries {
+  flex: 1 1 auto;
+  background: rgba(10, 19, 32, 0.6);
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 13px;
+  line-height: 1.4;
+  overflow-y: auto;
+  color: #c5d8f5;
+  border: 1px solid rgba(90, 138, 210, 0.15);
+}
+
+.log-entry {
+  margin-bottom: 8px;
+}
+
+.toast {
+  position: fixed;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  padding: 12px 20px;
+  background: rgba(18, 34, 58, 0.95);
+  border-radius: 999px;
+  color: #d8ecff;
+  font-size: 14px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.toast.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+@media (max-width: 1080px) {
+  .layout {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sidebar {
+    width: auto;
+  }
+}
