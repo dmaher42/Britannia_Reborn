@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Character, CharacterClass } from '../party.js';
+import { Inventory } from '../inventory.js';
 
 const demoItem = (overrides = {}) => ({ id: 'chain_mail', name: 'Chain Mail', weight: 6, qty: 1, equip: 'torso', ...overrides });
 
@@ -30,6 +31,15 @@ describe('Equipment and pack weight limits', () => {
     c.equipment.torso = demoItem({ weight: 6 });
     expect(c.isOverweight()).toBe(true);
   });
+  it('Retains previous gear when new item would exceed STR', () => {
+    const c = new Character({ name: 'A', cls: CharacterClass.Fighter, STR: 5, DEX: 5, INT: 5 });
+    const lightArmor = demoItem({ id: 'leather', name: 'Leather', weight: 4 });
+    const heavyArmor = demoItem({ id: 'plate', name: 'Plate', weight: 6 });
+    expect(c.equip(lightArmor)).toBe(true);
+    expect(c.equipment.torso.id).toBe('leather');
+    expect(c.equip(heavyArmor)).toBe(false);
+    expect(c.equipment.torso.id).toBe('leather');
+  });
   it('Backpack weight must not exceed STR*2', () => {
     const c = new Character({ name: 'A', cls: CharacterClass.Fighter, STR: 5, DEX: 5, INT: 5 });
     expect(c.addToBackpack({ id: 'rock', name: 'Rock', weight: 6, qty: 2 })).toBe(false);
@@ -38,6 +48,23 @@ describe('Equipment and pack weight limits', () => {
     expect(c.isOverweight()).toBe(false);
     c.backpack.push({ id: 'heavy', name: 'Heavy', weight: 3, qty: 2 });
     expect(c.isOverweight()).toBe(true);
+  });
+});
+
+describe('Inventory consumables', () => {
+  it('consume reduces quantity and removes entry when depleted', () => {
+    const inventory = new Inventory([
+      { id: 'healing_potion', name: 'Healing Potion', weight: 0.3, qty: 2, tag: 'consumable' }
+    ]);
+
+    expect(inventory.consume('healing_potion', 1)).toBe(true);
+    expect(inventory.count('healing_potion')).toBe(1);
+
+    expect(inventory.consume('healing_potion', 1)).toBe(true);
+    expect(inventory.count('healing_potion')).toBe(0);
+    expect(inventory.items.some((item) => item.id === 'healing_potion')).toBe(false);
+
+    expect(inventory.consume('healing_potion', 1)).toBe(false);
   });
 });
 

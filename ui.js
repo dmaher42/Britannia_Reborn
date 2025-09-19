@@ -11,7 +11,9 @@ export function setupUI({
   onTalk,
   onCast,
   onStartCombat,
-  onAddLoot
+  onAddLoot,
+  onEquipItem,
+  onUseItem
 }) {
   const partyList = document.getElementById('partyList');
   const inventoryList = document.getElementById('inventoryList');
@@ -173,7 +175,51 @@ export function setupUI({
       const row = document.createElement('div');
       row.className = 'inventory-item';
       const weight = item.weight * item.qty;
-      row.innerHTML = `<span>${item.name}</span><span>x${item.qty}</span><span>${formatWeight(weight)}</span>`;
+      const nameSpan = document.createElement('span');
+      nameSpan.textContent = item.name;
+
+      const qtySpan = document.createElement('span');
+      qtySpan.textContent = `x${item.qty}`;
+
+      const weightSpan = document.createElement('span');
+      weightSpan.textContent = formatWeight(weight);
+
+      row.append(nameSpan, qtySpan, weightSpan);
+
+      const actions = document.createElement('div');
+      actions.className = 'inventory-actions';
+      let hasAction = false;
+
+      if (item.equip && typeof onEquipItem === 'function') {
+        const equipButton = document.createElement('button');
+        equipButton.type = 'button';
+        equipButton.className = 'inventory-action equip';
+        equipButton.textContent = 'Equip';
+        equipButton.addEventListener('click', (event) => {
+          event.stopPropagation();
+          onEquipItem(item.id);
+        });
+        actions.appendChild(equipButton);
+        hasAction = true;
+      }
+
+      if (item.tag === 'consumable' && typeof onUseItem === 'function') {
+        const useButton = document.createElement('button');
+        useButton.type = 'button';
+        useButton.className = 'inventory-action use';
+        useButton.textContent = 'Use';
+        useButton.addEventListener('click', (event) => {
+          event.stopPropagation();
+          onUseItem(item.id);
+        });
+        actions.appendChild(useButton);
+        hasAction = true;
+      }
+
+      if (hasAction) {
+        row.appendChild(actions);
+      }
+
       fragment.appendChild(row);
     });
     inventoryList.appendChild(fragment);
