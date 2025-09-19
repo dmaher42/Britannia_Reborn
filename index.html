@@ -28,7 +28,7 @@
     <aside class="sidebar" aria-label="Party and inventory">
       <section class="panel">
         <header>
-          <h2>Party</h2>
+          <h2>Character</h2>
         </header>
         <ul id="partyList" class="party-list" aria-live="polite"></ul>
       </section>
@@ -44,50 +44,26 @@
       </section>
       <section class="panel travel">
         <header>
-          <h2>Destinations</h2>
+          <h2>World</h2>
         </header>
-        <label class="travel-label" for="destinationSelect">Fast travel</label>
-        <select id="destinationSelect" aria-label="Fast travel destinations"></select>
-        <button id="btnTravel" type="button">Travel</button>
-        <p class="travel-hint">Select a destination to reposition the party instantly.</p>
+        <div class="world-stats">
+          <div><span>Area</span><span id="worldArea">-</span></div>
+          <div><span>Tile</span><span id="worldTile">-</span></div>
+        </div>
+        <div class="button-row">
+          <button id="btn-save" type="button" data-tip="Manually save your adventure.">Save Game</button>
+          <button id="btn-load" type="button" data-tip="Load the most recent save.">Load Game</button>
+        </div>
+        <p class="travel-hint">Autosave triggers on level ups and when changing areas.</p>
       </section>
       <section class="panel actions">
-        <header><h2>Actions</h2></header>
+        <header><h2>Combat</h2></header>
         <div class="button-row">
-          <button
-            id="btn-talk"
-            class="action-btn"
-            type="button"
-            data-tip="Speak with nearby NPCs."
-          >
-            Talk
-          </button>
-          <button
-            id="btn-cast-fire-dart"
-            class="action-btn"
-            type="button"
-            data-tip="Single-target fire spell. Uses Sulfur Ash."
-          >
-            Cast: Fire Dart
-          </button>
-          <button
-            id="btn-start-combat"
-            class="action-btn"
-            type="button"
-            data-tip="Enter tactical mode; actions cost AP."
-          >
-            Start Combat
-          </button>
-          <button
-            id="btn-end-turn"
-            class="action-btn"
-            type="button"
-            data-tip="Finish current actor's turn."
-          >
-            End Turn
-          </button>
-          <button id="btnAddLoot" class="action-btn" type="button">Add Loot</button>
+          <button id="btn-attack" class="action-btn" type="button" data-tip="Strike the selected enemy.">Attack</button>
+          <button id="btn-defend" class="action-btn" type="button" data-tip="Increase defense and reduce incoming damage.">Defend</button>
+          <button id="btn-use-item" class="action-btn" type="button" data-tip="Consume a potion or item.">Use Item</button>
         </div>
+        <p class="travel-hint">Shortcuts: C — Character, I — Inventory, J — Journal.</p>
       </section>
       <section class="panel log" aria-live="polite">
         <header><h2>Journal</h2></header>
