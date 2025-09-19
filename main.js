@@ -35,7 +35,8 @@ const party = new Party(
   [
     { name: 'Avatar', cls: CharacterClass.Avatar, STR: 12, DEX: 10, INT: 10, hpMax: 32, baseSpeed: 110 },
     { name: 'Iolo', cls: CharacterClass.Bard, STR: 9, DEX: 12, INT: 8, hpMax: 24, baseSpeed: 108 },
-    { name: 'Shamino', cls: CharacterClass.Ranger, STR: 11, DEX: 11, INT: 10, hpMax: 26, baseSpeed: 112 }
+    { name: 'Shamino', cls: CharacterClass.Ranger, STR: 11, DEX: 11, INT: 10, hpMax: 26, baseSpeed: 112 },
+    { name: 'Lord British', cls: CharacterClass.LordBritish, STR: 12, DEX: 11, INT: 14, hpMax: 38, baseSpeed: 114 }
   ],
   { followSpacing: 42, collisionRadius: 14 }
 );

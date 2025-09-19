@@ -5,9 +5,11 @@ import { Inventory } from '../inventory.js';
 const demoItem = (overrides = {}) => ({ id: 'chain_mail', name: 'Chain Mail', weight: 6, qty: 1, equip: 'torso', ...overrides });
 
 describe('Character MP per class', () => {
-  it('Avatar gets INT*2 MP', () => {
-    const c = new Character({ name: 'A', cls: CharacterClass.Avatar, STR: 10, DEX: 10, INT: 8 });
-    expect(c.mpMax).toBe(16);
+  it('Avatar and Lord British get INT*2 MP', () => {
+    const avatar = new Character({ name: 'A', cls: CharacterClass.Avatar, STR: 10, DEX: 10, INT: 8 });
+    const lordBritish = new Character({ name: 'LB', cls: CharacterClass.LordBritish, STR: 10, DEX: 10, INT: 8 });
+    expect(avatar.mpMax).toBe(16);
+    expect(lordBritish.mpMax).toBe(16);
   });
   it('Bard/Ranger get INT/2 MP', () => {
     const bard = new Character({ name: 'B', cls: CharacterClass.Bard, STR: 10, DEX: 10, INT: 8 });

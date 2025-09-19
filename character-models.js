@@ -41,6 +41,24 @@ const CLASS_MODELS = {
     iconSecondary: '#9a7a43',
     sashColor: '#d55440'
   }),
+  [CharacterClass.LordBritish]: createModel({
+    cloakLight: '#1c3a8a',
+    cloakShadow: '#0e225c',
+    cloakTrim: '#f5d56f',
+    armorLight: '#f2e8c8',
+    armorShadow: '#c6b480',
+    accent: '#b4373f',
+    accentSecondary: '#f9ebba',
+    belt: '#4f3724',
+    medallion: '#fbe48c',
+    hair: '#c09a52',
+    icon: 'sword',
+    iconColor: '#f8d77a',
+    iconSecondary: '#8b6a2b',
+    sashColor: '#b83a48',
+    auraInner: 'rgba(255, 235, 180, 0.78)',
+    auraOuter: 'rgba(255, 205, 96, 0)'
+  }),
   [CharacterClass.Bard]: createModel({
     cloakLight: '#28504d',
     cloakShadow: '#173333',
