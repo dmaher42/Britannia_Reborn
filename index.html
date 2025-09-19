@@ -54,10 +54,39 @@
       <section class="panel actions">
         <header><h2>Actions</h2></header>
         <div class="button-row">
-          <button id="btnTalk" type="button">Talk</button>
-          <button id="btnCast" type="button">Cast Fire Dart</button>
-          <button id="btnCombat" type="button">Start Skirmish</button>
-          <button id="btnAddLoot" type="button">Add Loot</button>
+          <button
+            id="btn-talk"
+            class="action-btn"
+            type="button"
+            data-tip="Speak with nearby NPCs."
+          >
+            Talk
+          </button>
+          <button
+            id="btn-cast-fire-dart"
+            class="action-btn"
+            type="button"
+            data-tip="Single-target fire spell. Uses Sulfur Ash."
+          >
+            Cast: Fire Dart
+          </button>
+          <button
+            id="btn-start-combat"
+            class="action-btn"
+            type="button"
+            data-tip="Enter tactical mode; actions cost AP."
+          >
+            Start Combat
+          </button>
+          <button
+            id="btn-end-turn"
+            class="action-btn"
+            type="button"
+            data-tip="Finish current actor's turn."
+          >
+            End Turn
+          </button>
+          <button id="btnAddLoot" class="action-btn" type="button">Add Loot</button>
         </div>
       </section>
       <section class="panel log" aria-live="polite">
@@ -67,6 +96,7 @@
     </aside>
   </div>
   <div id="toast" class="toast" hidden role="status" aria-live="assertive"></div>
+  <div id="tooltip-root" aria-hidden="true"></div>
   <script type="module" src="./main.js"></script>
 </body>
 </html>
