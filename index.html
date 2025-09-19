@@ -145,6 +145,7 @@
 
   <script type="module" id="game-script">
     const showBootError = window.__britanniaShowBootError || ((message, error) => console.error(message, error));
+    // buildTag is provided by the boot script above via __BR_BUILD_TAG
     const buildTag = window.__BR_BUILD_TAG || '3';
     const canBoot = window.__BR_CAN_BOOT !== false;
 
