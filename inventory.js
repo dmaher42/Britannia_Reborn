@@ -1,12 +1,40 @@
-const normalizeItem = (item) => ({
-  id: item.id,
-  name: item.name ?? item.id,
-  weight: typeof item.weight === 'number' ? item.weight : 0,
-  qty: typeof item.qty === 'number' ? item.qty : 1,
-  tag: item.tag,
-  equip: item.equip,
-  restricted: Array.isArray(item.restricted) ? [...item.restricted] : undefined
-});
+const normalizeItem = (item) => {
+  if (!item || typeof item !== 'object') {
+    throw new TypeError('Invalid item provided to inventory.');
+  }
+
+  const quantity = Number.isFinite(item.quantity)
+    ? Math.max(0, Math.round(item.quantity))
+    : Number.isFinite(item.qty)
+    ? Math.max(0, Math.round(item.qty))
+    : 1;
+
+  const weight = Number.isFinite(item.weight)
+    ? item.weight
+    : Number.isFinite(item?.stats?.weight)
+    ? item.stats.weight
+    : 0;
+
+  const stats = { ...(item.stats ?? {}) };
+  if (!Number.isFinite(stats.weight)) {
+    stats.weight = weight;
+  }
+
+  return {
+    id: item.id,
+    name: item.name ?? item.id,
+    type: item.type ?? item.tag ?? 'material',
+    stats,
+    value: Number.isFinite(item.value) ? item.value : 0,
+    stackable: item.stackable ?? !item.equip,
+    quantity,
+    weight,
+    description: item.description ?? '',
+    meta: item.meta ? { ...item.meta } : undefined,
+  };
+};
+
+const cloneItem = (item) => JSON.parse(JSON.stringify(item));
 
 export class Inventory {
   constructor(items = []) {
@@ -15,59 +43,85 @@ export class Inventory {
     items.forEach((item) => this.add(item));
   }
 
-  add(item) {
-    const normalized = normalizeItem(item);
-    const existing = this.items.find((it) => it.id === normalized.id && it.equip === normalized.equip);
-    if (existing && !normalized.equip) {
-      existing.qty += normalized.qty;
-      existing.weight = normalized.weight; // assume consistent weight per unit
-      return existing;
-    }
-
-    this.items.push({ ...normalized });
-    return normalized;
+  _findIndex(id) {
+    return this.items.findIndex((entry) => entry.id === id);
   }
 
-  remove(id, qty = 1) {
-    const idx = this.items.findIndex((item) => item.id === id);
-    if (idx === -1) return false;
-    const item = this.items[idx];
-    if (item.qty > qty) {
-      item.qty -= qty;
+  get(id) {
+    return this.items[this._findIndex(id)] ?? null;
+  }
+
+  add(item) {
+    const normalized = normalizeItem(item);
+    if (!normalized.id) throw new Error('Inventory items require an id.');
+
+    const existingIndex = this._findIndex(normalized.id);
+    if (existingIndex !== -1 && this.items[existingIndex].stackable && normalized.stackable) {
+      this.items[existingIndex].quantity += normalized.quantity;
+      this.items[existingIndex].weight = normalized.weight;
+      this.items[existingIndex].stats = { ...normalized.stats };
+      return cloneItem(this.items[existingIndex]);
+    }
+
+    this.items.push(cloneItem(normalized));
+    return cloneItem(normalized);
+  }
+
+  remove(id, quantity = 1) {
+    const index = this._findIndex(id);
+    if (index === -1) return false;
+    const entry = this.items[index];
+    const amount = Number.isFinite(quantity) ? Math.max(0, Math.round(quantity)) : 0;
+    if (amount <= 0) return true;
+
+    if (entry.quantity > amount) {
+      entry.quantity -= amount;
       return true;
     }
-    this.items.splice(idx, 1);
+
+    this.items.splice(index, 1);
     return true;
+  }
+
+  consume(id, quantity = 1) {
+    const entry = this.get(id);
+    if (!entry || entry.quantity < quantity) return false;
+    return this.remove(id, quantity);
   }
 
   count(id) {
-    return this.items
-      .filter((item) => item.id === id)
-      .reduce((total, item) => total + item.qty, 0);
+    const entry = this.get(id);
+    return entry ? entry.quantity : 0;
   }
 
-  consume(id, qty = 1) {
-    if (this.count(id) < qty) return false;
-    let remaining = qty;
-    for (const item of this.items) {
-      if (item.id !== id) continue;
-      const take = Math.min(item.qty, remaining);
-      item.qty -= take;
-      remaining -= take;
-      if (item.qty <= 0) {
-        const index = this.items.indexOf(item);
-        if (index !== -1) this.items.splice(index, 1);
-      }
-      if (remaining <= 0) break;
-    }
-    return true;
+  listByType(type) {
+    return this.items.filter((item) => item.type === type).map((item) => cloneItem(item));
   }
 
   totalWeight() {
-    return this.items.reduce((total, item) => total + item.weight * item.qty, 0);
+    return this.items.reduce((total, item) => total + item.weight * item.quantity, 0);
   }
 
-  summary() {
-    return this.items.map((item) => ({ id: item.id, name: item.name, qty: item.qty }));
+  toJSON() {
+    return this.items.map((item) => cloneItem(item));
+  }
+
+  loadFrom(data = []) {
+    this.items = [];
+    if (!Array.isArray(data)) return;
+    data.forEach((item) => {
+      try {
+        this.add(item);
+      } catch (error) {
+        console.warn('Failed to load item', item, error);
+      }
+    });
   }
 }
+
+export const ItemHelpers = {
+  weightOf: (item) => (item ? item.weight ?? item?.stats?.weight ?? 0 : 0),
+  isEquippable: (item) => item?.type === 'weapon' || item?.type === 'armor' || item?.type === 'accessory',
+  isConsumable: (item) => item?.type === 'consumable',
+};
+

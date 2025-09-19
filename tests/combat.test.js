@@ -1,140 +1,78 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Party } from '../party.js';
-import { CombatSystem } from '../combat.js';
+import { Character } from '../Character.js';
+import { Player } from '../Player.js';
 import { Inventory } from '../inventory.js';
-import { Spellbook } from '../spells.js';
+import { CombatEngine } from '../CombatEngine.js';
 
-const createParty = (overrides = {}) => {
-  const baseMember = {
-    name: 'Avatar',
-    STR: 12,
-    DEX: 10,
-    INT: 10,
-    hpMax: 32,
-    hp: 32,
-    mp: 20
-  };
-  return new Party([{ ...baseMember, ...overrides }]);
+const createCombat = (overrides = {}) => {
+  const character = new Character({ stats: { STR: 12, DEX: 10, INT: 10, VIT: 12, LUK: 10 } });
+  const player = new Player(character, { x: 2, y: 2, area: 'forest' });
+  const inventory = new Inventory();
+  const combat = new CombatEngine({
+    player,
+    inventory,
+    rng: () => 0, // deterministic damage multiplier (0.8)
+    onRespawn: () => {},
+    ...overrides,
+  });
+  return { combat, character, player, inventory };
 };
 
-describe('CombatSystem', () => {
+const basicEnemy = () => ({
+  id: 'goblin',
+  name: 'Goblin',
+  hp: 24,
+  hpMax: 24,
+  attack: 8,
+  defense: 4,
+  level: 1,
+});
+
+describe('CombatEngine', () => {
+  let combat;
+  let character;
   let inventory;
-  let party;
 
   beforeEach(() => {
-    inventory = new Inventory();
-    party = createParty();
+    ({ combat, character, inventory } = createCombat());
   });
 
-  it('resolves victory when a player attack defeats the last enemy', () => {
-    const spellbook = new Spellbook(inventory, party);
-    const combat = new CombatSystem(party, { spellbook, enemyDelay: 0 });
-    const completions = [];
-    combat.onEvent((event, payload) => {
-      if (event === 'complete') {
-        completions.push(payload);
-      }
-    });
-
-    expect(
-      combat.startSkirmish([
-        { id: 'wolf', name: 'Dire Wolf', hp: 9, hpMax: 9, atk: 4, initiative: 11 }
-      ])
-    ).toBe(true);
-
-    const result = combat.playerAttack('wolf');
+  it('applies damage when the player attacks', () => {
+    combat.start([basicEnemy()]);
+    const result = combat.attack('goblin');
     expect(result.success).toBe(true);
-    expect(result.defeated).toBe(true);
-    expect(combat.getState().active).toBe(false);
-    expect(completions).toHaveLength(1);
-    expect(completions[0].victory).toBe(true);
+    const state = combat.getState();
+    const enemy = state.enemies[0];
+    // Base damage: (attack 12 - defense 4) * 0.8 = 6.4 -> 6
+    expect(enemy.hp).toBe(18);
   });
 
-  it('processes enemy retaliation that can defeat the party', () => {
-    party = createParty({ hpMax: 16, hp: 16 });
-    const combat = new CombatSystem(party, { enemyDelay: 0 });
-    const completions = [];
-    combat.onEvent((event, payload) => {
-      if (event === 'complete') {
-        completions.push(payload);
-      }
+  it('reduces incoming damage when defending', () => {
+    const enemy = basicEnemy();
+    enemy.attack = 20;
+    combat.start([enemy]);
+    const hpBefore = character.hp;
+    combat.defend();
+    const hpAfter = character.hp;
+    expect(hpBefore - hpAfter).toBeLessThan(3);
+  });
+
+  it('allows using consumables during combat', () => {
+    inventory.add({
+      id: 'potion',
+      name: 'Potion',
+      type: 'consumable',
+      stackable: true,
+      quantity: 1,
+      stats: { hp_restore: 40 },
     });
-
-    expect(
-      combat.startSkirmish([
-        { id: 'ogre', name: 'Ogre', hp: 28, hpMax: 28, atk: 24, initiative: 12 }
-      ])
-    ).toBe(true);
-
-    const result = combat.playerAttack('ogre');
+    combat.start([basicEnemy()]);
+    character.takeDamage(30);
+    const hpBefore = character.hp;
+    const result = combat.useItem('potion');
     expect(result.success).toBe(true);
-    expect(combat.active).toBe(true);
-
-    combat.update(0.01);
-
-    expect(party.members[0].hp).toBe(0);
-    expect(combat.active).toBe(false);
-    expect(completions).toHaveLength(1);
-    expect(completions[0].victory).toBe(false);
-  });
-
-  it('executes enemy actions according to initiative order', () => {
-    const combat = new CombatSystem(party, { enemyDelay: 0 });
-    const logs = [];
-    combat.onEvent((event, payload) => {
-      if (event === 'log') {
-        logs.push(payload);
-      }
-    });
-
-    expect(
-      combat.startSkirmish([
-        { id: 'mage', name: 'Shadow Mage', hp: 24, hpMax: 24, atk: 7, initiative: 16 },
-        { id: 'brute', name: 'Orc Brute', hp: 30, hpMax: 30, atk: 9, initiative: 8 }
-      ])
-    ).toBe(true);
-
-    const attackResult = combat.playerAttack('mage');
-    expect(attackResult.success).toBe(true);
-
-    combat.update(0.01);
-
-    const strikeLogs = logs.filter((entry) =>
-      typeof entry === 'string' && entry.includes('strikes Avatar')
-    );
-    expect(strikeLogs.length).toBeGreaterThanOrEqual(2);
-    expect(strikeLogs[0]).toContain('Shadow Mage');
-    expect(strikeLogs[1]).toContain('Orc Brute');
-  });
-
-  it('allows spellcasting to end a skirmish and consume resources', () => {
-    inventory.add({ id: 'sulfur_ash', name: 'Sulfur Ash', weight: 0.1, qty: 2, tag: 'reagent' });
-    inventory.add({ id: 'black_pearl', name: 'Black Pearl', weight: 0.1, qty: 2, tag: 'reagent' });
-    const spellbook = new Spellbook(inventory, party);
-    const combat = new CombatSystem(party, { spellbook, enemyDelay: 0 });
-    const completions = [];
-    combat.onEvent((event, payload) => {
-      if (event === 'complete') {
-        completions.push(payload);
-      }
-    });
-
-    expect(
-      combat.startSkirmish([
-        { id: 'imp', name: 'Lesser Imp', hp: 12, hpMax: 12, atk: 3, initiative: 10 }
-      ])
-    ).toBe(true);
-
-    const leader = party.leader;
-    const mpBefore = leader.mp;
-
-    const castResult = combat.playerCast('fire_dart', 'imp');
-    expect(castResult.success).toBe(true);
-    expect(combat.getState().active).toBe(false);
-    expect(leader.mp).toBe(mpBefore - 6);
-    expect(inventory.count('sulfur_ash')).toBe(1);
-    expect(inventory.count('black_pearl')).toBe(1);
-    expect(completions).toHaveLength(1);
-    expect(completions[0].victory).toBe(true);
+    expect(character.hp).toBeGreaterThan(hpBefore);
+    expect(inventory.count('potion')).toBe(0);
   });
 });
+

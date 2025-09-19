@@ -1,610 +1,474 @@
-import { createDemoWorld, drawWorld, RoomLibrary } from './world.js';
-import { Party, CharacterClass } from './party.js';
-import { Inventory } from './inventory.js';
-import { Spellbook, castFireDart } from './spells.js';
-import { CombatSystem } from './combat.js';
+import { createCharacterCreator } from './CharacterCreator.js';
+import { Character } from './Character.js';
+import { Player } from './Player.js';
+import { GameMap } from './GameMap.js';
+import { MapRenderer } from './MapRenderer.js';
+import { Inventory, ItemHelpers } from './inventory.js';
+import { ItemGenerator } from './ItemGenerator.js';
+import { CombatEngine } from './CombatEngine.js';
+import { Enemy } from './Enemy.js';
+import { SaveManager, buildSaveData } from './SaveManager.js';
 import { InputController } from './controls.js';
 import { setupUI } from './ui.js';
-import { clamp } from './utils.js';
-import { drawCharacterModel } from './character-models.js';
 import { initTooltips } from './public/ui/tooltip.js';
-import * as Fx from './public/fx/Fx.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const minimapCanvas = document.getElementById('minimap');
 const minimapCtx = minimapCanvas?.getContext('2d') ?? null;
-const minimapState = { width: 0, height: 0, padding: 12 };
 
-const world = createDemoWorld();
-
-const roomIds = Object.keys(RoomLibrary);
-let currentRoomId = 'lordBritishCastle';
-if (!RoomLibrary[currentRoomId]) {
-  currentRoomId = RoomLibrary.meadow ? 'meadow' : roomIds[0];
-}
-if (!RoomLibrary[currentRoomId] && roomIds.length > 0) {
-  currentRoomId = roomIds[0];
-}
-const travelDestinations = roomIds.map((id) => ({
-  id,
-  name: RoomLibrary[id]?.name ?? id
-}));
-
-const party = new Party(
-  [
-    { name: 'Avatar', cls: CharacterClass.Avatar, STR: 12, DEX: 10, INT: 10, hpMax: 32, baseSpeed: 110 },
-    { name: 'Iolo', cls: CharacterClass.Bard, STR: 9, DEX: 12, INT: 8, hpMax: 24, baseSpeed: 108 },
-    { name: 'Shamino', cls: CharacterClass.Ranger, STR: 11, DEX: 11, INT: 10, hpMax: 26, baseSpeed: 112 },
-    { name: 'Lord British', cls: CharacterClass.LordBritish, STR: 12, DEX: 11, INT: 14, hpMax: 38, baseSpeed: 114 }
-  ],
-  { followSpacing: 42, collisionRadius: 14 }
-);
-
-const inventory = new Inventory();
-inventory.gold = 125;
-inventory.add({ id: 'sulfur_ash', name: 'Sulfur Ash', weight: 0.1, qty: 3, tag: 'reagent' });
-inventory.add({ id: 'black_pearl', name: 'Black Pearl', weight: 0.1, qty: 3, tag: 'reagent' });
-inventory.add({ id: 'healing_potion', name: 'Healing Potion', weight: 0.3, qty: 2, tag: 'consumable' });
-party.members[0].addToBackpack({ id: 'bedroll', name: 'Bedroll', weight: 1.2, qty: 1 });
-
-const spellbook = new Spellbook(inventory, party);
-const combat = new CombatSystem(party, { spellbook });
-const input = new InputController(window);
-
-const ACTION_TIP_MAP = {
-  'btn-talk': 'Speak with nearby NPCs.',
-  'btn-start-combat': 'Enter tactical mode; actions cost AP.',
-  'btn-cast-fire-dart': 'Single-target fire spell. Uses Sulfur Ash.',
-  'btn-end-turn': "Finish current actor's turn."
-};
-
-function getActiveCharacter() {
-  return party.leader ?? null;
-}
-
-function handleEquipItem(itemId) {
-  const actor = getActiveCharacter();
-  if (!actor) {
-    ui.showToast('No party member is ready to equip that item.');
-    ui.log('No one steps forward to claim the gear.');
-    return;
-  }
-
-  const item = inventory.items.find((entry) => entry.id === itemId);
-  if (!item) {
-    ui.showToast('That item is not in the party inventory.');
-    ui.log(`${actor.name} searches the packs but finds nothing matching that description.`);
-    return;
-  }
-
-  if (!item.equip) {
-    ui.showToast(`${item.name} cannot be equipped.`);
-    ui.log(`${actor.name} examines the ${item.name}, but it cannot be worn.`);
-    return;
-  }
-
-  if (Array.isArray(item.restricted) && item.restricted.length > 0 && !item.restricted.includes(actor.cls)) {
-    const allowed = item.restricted.join(', ');
-    ui.showToast(`${item.name} is restricted to ${allowed}.`);
-    ui.log(`${actor.name} cannot equip the ${item.name}. Allowed classes: ${allowed}.`);
-    return;
-  }
-
-  const previous = actor.equipment[item.equip];
-  if (!actor.equip(item)) {
-    ui.showToast(`${actor.name} cannot equip the ${item.name}; it would overburden them.`);
-    ui.log(`${actor.name} struggles with the ${item.name}, but lacks the strength to wear it.`);
-    return;
-  }
-
-  const removed = inventory.remove(item.id, 1);
-  if (!removed) {
-    actor.equipment[item.equip] = previous ? { ...previous } : null;
-    ui.showToast(`The ${item.name} slips back into the pack.`);
-    ui.log(`The party fumbles for the ${item.name}, but it remains in storage.`);
-    return;
-  }
-
-  if (previous) {
-    const previousQty = typeof previous.qty === 'number' ? previous.qty : 1;
-    inventory.add({ ...previous, qty: previousQty });
-  }
-
-  const itemName = item.name ?? item.id;
-  ui.log(`${actor.name} equips the ${itemName}.`);
-  if (previous) {
-    ui.log(`The ${previous.name ?? previous.id} is returned to the party inventory.`);
-  }
-  ui.showToast(`${actor.name} equips ${itemName}.`);
-  ui.refreshParty();
-  ui.refreshInventory();
-}
-
-function handleUseItem(itemId) {
-  const actor = getActiveCharacter();
-  if (!actor) {
-    ui.showToast('No party member is ready to use that item.');
-    ui.log('The party hesitates, unsure who should use the item.');
-    return;
-  }
-
-  const item = inventory.items.find((entry) => entry.id === itemId);
-  if (!item) {
-    ui.showToast('That item is not in the party inventory.');
-    ui.log(`${actor.name} cannot find the requested item among the supplies.`);
-    return;
-  }
-
-  if (item.tag !== 'consumable') {
-    ui.showToast(`${item.name} cannot be used right now.`);
-    ui.log(`${actor.name} cannot find a use for the ${item.name}.`);
-    return;
-  }
-
-  const itemName = item.name ?? item.id;
-  if (!inventory.consume(item.id, 1)) {
-    ui.showToast(`The party has no ${itemName} left to use.`);
-    ui.log(`${actor.name} searches the packs for ${itemName}, but finds none.`);
-    return;
-  }
-
-  ui.log(`${actor.name} uses ${itemName}.`);
-  ui.showToast(`${itemName} consumed.`);
-  ui.refreshParty();
-  ui.refreshInventory();
-}
-
-const ui = setupUI({
-  party,
-  inventory,
-  spellbook,
-  combat,
-  destinations: travelDestinations,
-  currentDestinationId: currentRoomId,
-  onTravel: travelTo,
-  onTalk: () => {
-    const speaker = party.leader;
-    ui.log(`${speaker.name} trades words with a wary villager.`);
-    ui.showToast('The townsfolk wish you safe travels.');
-  },
-  onCast: () => {
-    const caster = party.leader;
-    if (!spellbook.canCast('fire_dart', caster)) {
-      ui.showToast('You lack the reagents or focus for Fire Dart.');
-      return;
-    }
-    castFireDart(caster, spellbook);
-    ui.log(`${caster.name} looses a dart of flame into the twilight.`);
-    ui.refreshInventory();
-    ui.refreshParty();
-  },
-  onStartCombat: () => {
-    const ambushers = [
-      { id: 'brigand_scout', name: 'Brigand Scout', hp: 18, hpMax: 18, atk: 6, initiative: 13 },
-      { id: 'cutpurse', name: 'Cutpurse', hp: 14, hpMax: 14, atk: 5, initiative: 10 }
-    ];
-    if (combat.startSkirmish(ambushers)) {
-      ui.showToast('A skirmish erupts!');
-    } else {
-      ui.showToast('The skirmish is already underway.');
-    }
-  },
-  onEndTurn: () => {
-    if (!combat) {
-      ui.showToast('No combat is underway.');
-      return;
-    }
-    const ended = combat.endPlayerTurn();
-    if (ended) {
-      ui.log('The party yields the initiative.');
-      ui.showToast('Turn ended.');
-    } else {
-      ui.showToast('No active turn to end.');
-    }
-  },
-  onAddLoot: () => {
-    inventory.add({ id: 'chain_mail', name: 'Chain Mail', weight: 6, qty: 1, equip: 'torso', tag: 'armor' });
-    inventory.add({ id: 'spider_silk', name: 'Spider Silk', weight: 0.4, qty: 2, tag: 'reagent' });
-    party.members[1].addToBackpack({ id: 'field_rations', name: 'Field Rations', weight: 0.5, qty: 2 });
-    ui.refreshInventory();
-    ui.refreshParty();
-    ui.showToast('New supplies have been stowed.');
-  },
-  onEquipItem: handleEquipItem,
-  onUseItem: handleUseItem
-});
-
-initTooltips({ selector: '.action-btn,[data-tip]', tipMap: ACTION_TIP_MAP });
-
-combat.onEvent((event, payload) => {
-  if (event !== 'complete') return;
-  const victory = !!payload?.victory;
-  const rewards = payload?.rewards ?? { xp: 0, gold: 0 };
-  if (victory) {
-    const logs = [];
-    if (rewards.gold) {
-      inventory.gold = (inventory.gold ?? 0) + rewards.gold;
-      logs.push(`The party recovers ${rewards.gold} gold from the fallen.`);
-    }
-    if (rewards.xp) {
-      party.members.forEach((member) => {
-        member.xp = (member.xp ?? 0) + rewards.xp;
-      });
-      logs.push(`Each companion earns ${rewards.xp} experience.`);
-    }
-    logs.forEach((message) => ui.log(message));
-    if (rewards.gold || rewards.xp) {
-      ui.refreshInventory();
-      ui.refreshParty();
-    }
-  } else {
-    ui.log('The enemy forces the party to retreat and regroup.');
-  }
-});
-
-ui.log('The Avatar steps into the expanded courtyard of Castle Britannia, its new wings bustling with life.');
-ui.showToast('Castle Britannia opens new wings to explore. Select a destination to travel.');
-
-const camera = { x: 0, y: 0, width: 0, height: 0, deadzone: { width: 320, height: 220 } };
 const deviceRatio = Math.min(window.devicePixelRatio || 1, 2);
 
-Fx.init({
-  getCamera: () => ({ x: camera.x, y: camera.y, width: camera.width, height: camera.height }),
-  worldToScreen: ({ x, y }) => ({ sx: Math.round(x - camera.x), sy: Math.round(y - camera.y) })
+const map = new GameMap();
+const renderer = new MapRenderer();
+const itemGenerator = new ItemGenerator();
+const inventory = new Inventory([
+  {
+    id: 'traveler_blade',
+    name: 'Traveler Blade',
+    type: 'weapon',
+    stats: { attack: 5, str_req: 10, weight: 2.4 },
+    stackable: false,
+    value: 36,
+    weight: 2.4,
+  },
+  {
+    id: 'leather_coat_1',
+    name: 'Worn Leather',
+    type: 'armor',
+    stats: { defense: 4, str_req: 10, weight: 3.8 },
+    stackable: false,
+    value: 28,
+    weight: 3.8,
+  },
+  {
+    id: 'health_potion',
+    name: 'Health Draught',
+    type: 'consumable',
+    stats: { hp_restore: 40, weight: 0.4 },
+    stackable: true,
+    quantity: 2,
+    value: 25,
+    weight: 0.4,
+  },
+  {
+    id: 'mana_potion',
+    name: 'Mana Tonic',
+    type: 'consumable',
+    stats: { mp_restore: 30, weight: 0.3 },
+    stackable: true,
+    quantity: 1,
+    value: 32,
+    weight: 0.3,
+  },
+]);
+inventory.gold = 75;
+
+const saveManager = new SaveManager();
+const input = new InputController(window);
+
+let character = null;
+let player = null;
+let combat = null;
+let awaitingItemSelection = false;
+let transitionCooldown = 0;
+let lastTileKey = '';
+let panelsState = { character: true, inventory: false, journal: false };
+
+const ui = setupUI({
+  onAttack: (targetId) => {
+    if (!combat) return;
+    const result = combat.attack(targetId);
+    if (!result.success && result.message) {
+      ui.showToast(result.message);
+    }
+  },
+  onDefend: () => {
+    if (!combat) return;
+    const result = combat.defend();
+    if (!result.success && result.message) {
+      ui.showToast(result.message);
+    }
+  },
+  onUseItemAction: () => {
+    if (!combat || !combat.isPlayerTurn()) {
+      ui.showToast('Items can be used from the inventory.');
+      return;
+    }
+    awaitingItemSelection = true;
+    ui.highlightConsumables(true);
+    ui.renderInventory(inventory, character);
+    ui.showToast('Select a consumable from the inventory.');
+  },
+  onEquip: (itemId) => handleEquip(itemId),
+  onUseItem: (itemId) => handleUseItem(itemId),
+  onSave: () => manualSave(),
+  onLoad: () => loadGame(),
+  onAllocateStat: (stat) => allocateStat(stat),
 });
 
-function resizeMinimap() {
-  if (!minimapCanvas || !minimapCtx) return;
-  const rect = minimapCanvas.getBoundingClientRect();
-  const width = rect.width || minimapCanvas.clientWidth || minimapCanvas.width || 0;
-  const height = rect.height || minimapCanvas.clientHeight || minimapCanvas.height || 0;
-  minimapState.width = width;
-  minimapState.height = height;
-  minimapCanvas.width = Math.max(1, Math.round(width * deviceRatio));
-  minimapCanvas.height = Math.max(1, Math.round(height * deviceRatio));
-  minimapCtx.setTransform(deviceRatio, 0, 0, deviceRatio, 0, 0);
-  minimapCtx.imageSmoothingEnabled = false;
-}
+const characterCreator = createCharacterCreator({
+  onCreate: (createdCharacter) => {
+    startNewGame(createdCharacter);
+    ui.showToast('A new hero awakens in Britannia.');
+  },
+});
 
-function resize() {
+const resizeCanvas = () => {
   const rect = canvas.getBoundingClientRect();
-  canvas.width = rect.width * deviceRatio;
-  canvas.height = rect.height * deviceRatio;
+  canvas.width = Math.max(1, Math.round(rect.width * deviceRatio));
+  canvas.height = Math.max(1, Math.round(rect.height * deviceRatio));
   ctx.setTransform(deviceRatio, 0, 0, deviceRatio, 0, 0);
-  camera.width = rect.width;
-  camera.height = rect.height;
-  resizeMinimap();
-  updateCamera(true);
-}
-
-function ensureCanvasSize() {
-  const parent = canvas.parentElement;
-  if (!parent) return;
-  const width = parent.clientWidth;
-  const height = parent.clientHeight;
-  if (canvas.style.width !== `${width}px` || canvas.style.height !== `${height}px`) {
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
+  if (minimapCanvas && minimapCtx) {
+    const miniRect = minimapCanvas.getBoundingClientRect();
+    minimapCanvas.width = Math.max(1, Math.round(miniRect.width * deviceRatio));
+    minimapCanvas.height = Math.max(1, Math.round(miniRect.height * deviceRatio));
+    minimapCtx.setTransform(deviceRatio, 0, 0, deviceRatio, 0, 0);
   }
-}
-
-window.addEventListener('resize', () => {
-  ensureCanvasSize();
-  resize();
-});
-ensureCanvasSize();
-resize();
-
-let lastStatus = '';
-let lastTerrain = '';
-
-const areaName = () => world.currentRoom?.name ?? 'the wilds';
-const areaNameWithArticle = () => {
-  const name = areaName();
-  return name.toLowerCase().startsWith('the ') ? name : `the ${name}`;
 };
 
-function updateStatus(text) {
-  if (text !== lastStatus) {
-    ui.setStatus(text);
-    lastStatus = text;
-  }
-}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
 
-function updateTerrain(name) {
-  if (name !== lastTerrain) {
-    ui.setTerrain(name);
-    lastTerrain = name;
-  }
-}
+const updatePanelsState = (updates) => {
+  panelsState = { ...panelsState, ...updates };
+  ui.setPanelsActive(panelsState);
+};
 
-function updateCamera(forceCenter = false) {
-  const leader = party.leader;
-  if (!leader) return;
-  const halfW = camera.width / 2;
-  const halfH = camera.height / 2;
-  const targetX = leader.x;
-  const targetY = leader.y;
-
-  if (forceCenter) {
-    camera.x = targetX - halfW;
-    camera.y = targetY - halfH;
-  } else {
-    const dead = camera.deadzone;
-    const left = camera.x + (camera.width - dead.width) / 2;
-    const right = left + dead.width;
-    const top = camera.y + (camera.height - dead.height) / 2;
-    const bottom = top + dead.height;
-
-    if (targetX < left) {
-      camera.x -= left - targetX;
-    } else if (targetX > right) {
-      camera.x += targetX - right;
-    }
-
-    if (targetY < top) {
-      camera.y -= top - targetY;
-    } else if (targetY > bottom) {
-      camera.y += targetY - bottom;
-    }
-  }
-
-  const { width, height } = world.getPixelSize();
-  camera.x = clamp(camera.x, 0, Math.max(0, width - camera.width));
-  camera.y = clamp(camera.y, 0, Math.max(0, height - camera.height));
-}
-
-async function travelTo(roomId) {
-  if (!roomId) return;
-  if (roomId === currentRoomId) {
-    const hereName = RoomLibrary[currentRoomId]?.name ?? areaName();
-    ui.showToast(`You are already exploring ${hereName}.`);
-    ui.setActiveDestination?.(currentRoomId);
+window.addEventListener('keydown', (event) => {
+  if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
     return;
   }
-
-  const destination = RoomLibrary[roomId];
-  if (!destination) {
-    ui.showToast('That destination has not yet been charted.');
-    return;
+  if (event.key === 'i' || event.key === 'I') {
+    event.preventDefault();
+    updatePanelsState({ inventory: !panelsState.inventory });
+  } else if (event.key === 'c' || event.key === 'C') {
+    event.preventDefault();
+    updatePanelsState({ character: !panelsState.character });
+  } else if (event.key === 'j' || event.key === 'J') {
+    event.preventDefault();
+    updatePanelsState({ journal: !panelsState.journal });
   }
+});
 
-  ui.setTravelBusy?.(true);
-  const destinationName = destination.name ?? destination.terrain ?? 'a distant locale';
-  ui.log(`Preparations begin for the journey to ${destinationName}.`);
-
-  try {
-    await world.loadRoom(destination);
-    currentRoomId = roomId;
-    party.placeAt(world.spawn.x, world.spawn.y);
-    updateCamera(true);
-    lastStatus = '';
-    lastTerrain = '';
-    const terrainInfo = world.terrainAtWorld();
-    updateTerrain(terrainInfo?.name ?? '-');
-    const arrivalName = destination.name ?? destination.terrain ?? 'a new locale';
-    updateStatus(`Arrived at ${arrivalName}.`);
-    ui.setActiveDestination?.(roomId);
-    ui.showToast(`Traveled to ${arrivalName}.`);
-    ui.log(`The party arrives at ${arrivalName}.`);
-  } catch (error) {
-    console.error(error);
-    ui.showToast('The moongates refuse the journey. Try again soon.');
-    ui.log('A tremor in the ether scatters the party, foiling the journey.');
-  } finally {
-    ui.setTravelBusy?.(false);
-  }
-}
-
-function update(dt) {
-  const inCombat = combat.active;
-  const direction = inCombat ? { x: 0, y: 0 } : input.getDirection();
-  party.update(dt, world, direction);
-  combat.update(dt);
-  Fx.update(dt);
-  updateCamera();
-
-  const leader = party.leader;
-  if (leader) {
-    const terrain = world.terrainAtWorld(leader.x, leader.y);
-    updateTerrain(terrain?.name ?? '-');
-    if (inCombat) {
-      if (combat.isPlayerTurn()) {
-        updateStatus('A skirmish is underway! Select an action for the party.');
-      } else {
-        updateStatus('Hold fast while the enemy makes their play.');
-      }
-    } else if (leader.isOverweight()) {
-      updateStatus(`${leader.name} is slowed by the weight of their gear.`);
-    } else if (direction.x !== 0 || direction.y !== 0) {
-      updateStatus(`Exploring ${areaName()}...`);
-    } else {
-      updateStatus(`Use WASD or the arrow keys to explore ${areaNameWithArticle()}.`);
-    }
-  }
-}
-
-function drawParty(ctx, party, cam) {
-  const radius = 19;
-  party.members.forEach((member, index) => {
-    const sx = member.x - cam.x;
-    const sy = member.y - cam.y;
-    const entityId = member.id ?? `party-${index}`;
-    Fx.registerEntityBounds(entityId, { x: member.x, y: member.y, radius, shape: 'circle', space: 'world' });
-    drawCharacterModel(ctx, member, {
-      x: sx,
-      y: sy,
-      radius,
-      isLeader: index === party.leaderIndex
-    });
-
-    ctx.save();
-    ctx.font = '12px "Inter", system-ui';
-    ctx.textAlign = 'center';
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
-    ctx.lineWidth = 3;
-    ctx.strokeText(member.name, sx, sy - radius * 1.55);
-    ctx.fillStyle = '#f6edd6';
-    ctx.fillText(member.name, sx, sy - radius * 1.55);
-    ctx.restore();
+const startNewGame = (newCharacter) => {
+  character = newCharacter instanceof Character ? newCharacter : new Character(newCharacter);
+  map.setArea('forest', map.currentArea?.spawn);
+  player = new Player(character, {
+    x: (map.currentArea?.spawn?.x ?? 2) + 0.5,
+    y: (map.currentArea?.spawn?.y ?? 2) + 0.5,
+    area: map.currentAreaId,
   });
-}
+  transitionCooldown = 0.8;
+  lastTileKey = '';
+  instantiateCombat();
+  ui.renderCharacter(character);
+  ui.renderInventory(inventory, character);
+  ui.setWorldInfo({ area: map.getAreaName(), tile: map.tileNameAt(Math.floor(player.position.x), Math.floor(player.position.y)) });
+  ui.log(`${character.name} arrives in the ${map.getAreaName()}.`);
+  autoSave('new-game');
+};
 
-function drawMinimap(world, party, cam) {
-  if (!minimapCtx || !minimapCanvas) return;
-  const { width, height, padding } = minimapState;
-  if (!width || !height) return;
+const instantiateCombat = () => {
+  if (combat) {
+    combat = null;
+  }
+  combat = new CombatEngine({
+    player,
+    inventory,
+    itemGenerator,
+    onRespawn: () => {
+      map.setArea('forest', map.currentArea?.spawn);
+      player.setArea('forest', map.currentArea?.spawn);
+      transitionCooldown = 1.2;
+      ui.setWorldInfo({ area: map.getAreaName(), tile: map.tileNameAt(Math.floor(player.position.x), Math.floor(player.position.y)) });
+      autoSave('respawn');
+    },
+  });
 
-  minimapCtx.save();
-  minimapCtx.setTransform(deviceRatio, 0, 0, deviceRatio, 0, 0);
-  minimapCtx.clearRect(0, 0, minimapCanvas.width, minimapCanvas.height);
+  combat.on('log', (message) => ui.log(message));
+  combat.on('state', (state) => {
+    ui.renderCombat(state);
+    if (state.turn !== 'player' && awaitingItemSelection) {
+      awaitingItemSelection = false;
+      ui.highlightConsumables(false);
+      ui.renderInventory(inventory, character);
+    }
+  });
+  combat.on('victory', ({ loot = [] }) => {
+    if (loot.length > 0) {
+      ui.renderInventory(inventory, character);
+      ui.showToast('Spoils added to the packs.');
+    }
+    ui.renderCharacter(character);
+    autoSave('victory');
+  });
+  combat.on('level-up', () => {
+    ui.renderCharacter(character);
+    ui.showToast(`${character.name} feels their power grow!`);
+    autoSave('level-up');
+  });
+  combat.on('defeat', () => {
+    awaitingItemSelection = false;
+    ui.highlightConsumables(false);
+    ui.renderInventory(inventory, character);
+    ui.renderCharacter(character);
+    ui.showToast('Defeated! You regroup at the forest edge.');
+  });
+};
 
-  minimapCtx.fillStyle = 'rgba(5, 12, 20, 0.92)';
-  minimapCtx.fillRect(0, 0, width, height);
+const manualSave = () => {
+  if (!character || !player) {
+    ui.showToast('Create a character before saving.');
+    return;
+  }
+  const success = saveManager.save(buildSaveData({ character, player, map, inventory }));
+  ui.showToast(success ? 'Progress saved.' : 'Failed to save.');
+};
 
-  const room = world.currentRoom;
-  if (!room) {
-    minimapCtx.restore();
+const autoSave = (reason) => {
+  if (!character || !player) return;
+  saveManager.save(buildSaveData({ character, player, map, inventory }));
+  if (reason === 'transition') {
+    ui.log('An autosave crystal hums as you cross into new lands.');
+  }
+};
+
+const loadGameFromData = (data) => {
+  if (!data) return false;
+  const loadedCharacter = Character.from(data.character);
+  if (!loadedCharacter) return false;
+  character = loadedCharacter;
+  map.load(data.world);
+  const position = data.player?.position ?? { x: (map.currentArea?.spawn?.x ?? 2) + 0.5, y: (map.currentArea?.spawn?.y ?? 2) + 0.5 };
+  player = new Player(character, { area: data.player?.area ?? map.currentAreaId, x: position.x, y: position.y });
+  inventory.loadFrom(data.inventory);
+  inventory.gold = data.inventoryGold ?? inventory.gold ?? 0;
+  transitionCooldown = 0.6;
+  lastTileKey = '';
+  instantiateCombat();
+  ui.renderCharacter(character);
+  ui.renderInventory(inventory, character);
+  ui.setWorldInfo({ area: map.getAreaName(), tile: map.tileNameAt(Math.floor(player.position.x), Math.floor(player.position.y)) });
+  ui.showToast('Loaded the last journey.');
+  ui.log('Past deeds resurface as the moongates align.');
+  return true;
+};
+
+const loadGame = () => {
+  const data = saveManager.load();
+  if (!loadGameFromData(data)) {
+    ui.showToast('No save data available.');
+  }
+};
+
+const handleEquip = (itemId) => {
+  if (!character) {
+    ui.showToast('Create a hero first.');
+    return;
+  }
+  const item = inventory.get(itemId);
+  if (!item) {
+    ui.showToast('That item is not in the packs.');
+    return;
+  }
+  if (!ItemHelpers.isEquippable(item)) {
+    ui.showToast('That item cannot be equipped.');
+    return;
+  }
+  if (!character.canEquip(item)) {
+    ui.showToast('You lack the strength to wield that.');
+    return;
+  }
+  const slot = item.type;
+  const previous = character.equipment[slot] ? { ...character.equipment[slot], quantity: 1 } : null;
+  if (!character.equip(item)) {
+    ui.showToast('You cannot equip that right now.');
+    return;
+  }
+  inventory.remove(item.id, 1);
+  if (previous) {
+    inventory.add(previous);
+  }
+  ui.renderCharacter(character);
+  ui.renderInventory(inventory, character);
+  ui.showToast(`${character.name} equips ${item.name}.`);
+  autoSave('equip');
+};
+
+const consumeItemEffect = (item) => {
+  let applied = false;
+  const effects = [];
+  if (item.stats?.hp_restore) {
+    const restored = character.heal(item.stats.hp_restore);
+    if (restored > 0) {
+      applied = true;
+      effects.push(`restores ${restored} HP`);
+    }
+  }
+  if (item.stats?.mp_restore) {
+    const restored = character.restoreMana(item.stats.mp_restore);
+    if (restored > 0) {
+      applied = true;
+      effects.push(`restores ${restored} MP`);
+    }
+  }
+  return { applied, effects };
+};
+
+const handleUseItem = (itemId) => {
+  if (!character) return;
+  const item = inventory.get(itemId);
+  if (!item) {
+    ui.showToast('Nothing like that remains in the packs.');
     return;
   }
 
-  const boundsWidth = room.bounds?.width ?? world.width ?? 0;
-  const boundsHeight = room.bounds?.height ?? world.height ?? 0;
-  if (!(boundsWidth > 0) || !(boundsHeight > 0)) {
-    minimapCtx.restore();
+  if (combat?.active && combat.isPlayerTurn()) {
+    const result = combat.useItem(itemId);
+    if (!result.success && result.message) {
+      ui.showToast(result.message);
+      return;
+    }
+    awaitingItemSelection = false;
+    ui.highlightConsumables(false);
+    ui.renderCharacter(character);
+    ui.renderInventory(inventory, character);
     return;
   }
 
-  const safePadding = typeof padding === 'number' ? Math.max(0, padding) : 0;
-  const availableWidth = Math.max(1, width - safePadding * 2);
-  const availableHeight = Math.max(1, height - safePadding * 2);
-  const scaleCandidate = Math.min(availableWidth / boundsWidth, availableHeight / boundsHeight);
-  const scale = Number.isFinite(scaleCandidate) && scaleCandidate > 0 ? scaleCandidate : 1;
-  const offsetX = (width - boundsWidth * scale) / 2;
-  const offsetY = (height - boundsHeight * scale) / 2;
-
-  const drawRect = (rect, minSize = 2) => {
-    if (!rect) return;
-    const x = rect.x ?? 0;
-    const y = rect.y ?? 0;
-    const rawWidth = (rect.width ?? rect.w ?? 0) * scale;
-    const rawHeight = (rect.height ?? rect.h ?? 0) * scale;
-    const drawWidth = Math.max(minSize, rawWidth);
-    const drawHeight = Math.max(minSize, rawHeight);
-    const px = offsetX + x * scale + (rawWidth - drawWidth) / 2;
-    const py = offsetY + y * scale + (rawHeight - drawHeight) / 2;
-    minimapCtx.fillRect(px, py, drawWidth, drawHeight);
-  };
-
-  const mapWidth = boundsWidth * scale;
-  const mapHeight = boundsHeight * scale;
-  minimapCtx.fillStyle = 'rgba(46, 96, 74, 0.72)';
-  minimapCtx.fillRect(offsetX, offsetY, mapWidth, mapHeight);
-  if (mapWidth > 2 && mapHeight > 2) {
-    minimapCtx.strokeStyle = 'rgba(156, 208, 255, 0.35)';
-    minimapCtx.lineWidth = 1.5;
-    minimapCtx.strokeRect(offsetX + 0.75, offsetY + 0.75, mapWidth - 1.5, mapHeight - 1.5);
+  if (!ItemHelpers.isConsumable(item)) {
+    ui.showToast('Only consumables can be used.');
+    return;
   }
 
-  if (Array.isArray(room.obstacles)) {
-    for (const obstacle of room.obstacles) {
-      const type = typeof obstacle?.type === 'string' ? obstacle.type.toLowerCase() : '';
-      if (type === 'water') {
-        minimapCtx.fillStyle = 'rgba(58, 132, 188, 0.7)';
-      } else {
-        minimapCtx.fillStyle = 'rgba(18, 32, 26, 0.82)';
-      }
-      drawRect(obstacle, 2.4);
+  const { applied, effects } = consumeItemEffect(item);
+  if (!applied) {
+    ui.showToast('The item has no effect.');
+    return;
+  }
+  inventory.remove(item.id, 1);
+  ui.renderCharacter(character);
+  ui.renderInventory(inventory, character);
+  ui.showToast(`${character.name} ${effects.join(' and ')}.`);
+  autoSave('item');
+};
+
+const allocateStat = (stat) => {
+  if (!character) return;
+  const success = character.allocateStat(stat, 1);
+  if (!success) {
+    ui.showToast('No stat points available.');
+    return;
+  }
+  ui.renderCharacter(character);
+  ui.showToast(`${stat} rises to ${character.stats[stat]}.`);
+  autoSave('stat');
+};
+
+const maybeTriggerEncounter = () => {
+  if (!player || !character || combat?.active) return;
+  const area = map.currentArea;
+  if (!area || area.safe) return;
+  if (Math.random() < 0.1) {
+    const count = 1 + Math.floor(Math.random() * 2);
+    const enemies = Array.from({ length: count }, () => Enemy.create(map.getAreaLevel()))
+      .map((enemy) => ({
+        id: enemy.id,
+        name: enemy.name,
+        hp: enemy.hp,
+        hpMax: enemy.hpMax,
+        attack: enemy.attack,
+        defense: enemy.defense,
+        level: enemy.level,
+        xpValue: enemy.xpValue,
+      }));
+    if (combat.start(enemies, map.getAreaLevel())) {
+      awaitingItemSelection = false;
+      ui.highlightConsumables(false);
+      ui.showToast('An encounter begins!');
+    }
+  }
+};
+
+const update = (dt) => {
+  if (!character || !player) return;
+  if (transitionCooldown > 0) {
+    transitionCooldown -= dt;
+  }
+
+  if (!combat?.active) {
+    player.update(dt, input, map);
+  }
+
+  const tileX = Math.floor(player.position.x);
+  const tileY = Math.floor(player.position.y);
+  const tileType = map.updateTileInfo(player.position.x, player.position.y);
+  ui.setTerrain(map.tileNameAt(tileX, tileY));
+  ui.setWorldInfo({ area: map.getAreaName(), tile: map.tileNameAt(tileX, tileY) });
+
+  if (!combat?.active) {
+    const tileKey = `${map.currentAreaId}:${tileX},${tileY}`;
+    if (tileKey !== lastTileKey) {
+      lastTileKey = tileKey;
+      maybeTriggerEncounter();
     }
   }
 
-  if (Array.isArray(room.props)) {
-    for (const prop of room.props) {
-      const type = typeof prop?.type === 'string' ? prop.type.toLowerCase() : '';
-      let color = 'rgba(86, 142, 112, 0.7)';
-      if (type === 'lantern' || type === 'brazier') {
-        color = 'rgba(255, 212, 132, 0.78)';
-      } else if (type === 'banner') {
-        color = 'rgba(198, 104, 98, 0.68)';
-      } else if (type === 'tent' || type === 'crate') {
-        color = 'rgba(196, 152, 108, 0.68)';
-      } else if (type === 'tree') {
-        color = 'rgba(72, 136, 94, 0.68)';
-      }
-      minimapCtx.fillStyle = color;
-      drawRect(prop, 2);
+  if (transitionCooldown <= 0) {
+    const transition = map.checkTransition(tileX, tileY);
+    if (transition) {
+      map.setArea(transition.to, transition.spawn);
+      player.setArea(transition.to, transition.spawn);
+      transitionCooldown = 1;
+      lastTileKey = '';
+      ui.showToast(`Entering ${map.getAreaName()}.`);
+      ui.log(`The party crosses into ${map.getAreaName()}.`);
+      ui.setWorldInfo({ area: map.getAreaName(), tile: map.tileNameAt(Math.floor(player.position.x), Math.floor(player.position.y)) });
+      autoSave('transition');
     }
   }
 
-  const view = cam ?? { x: 0, y: 0, width: 0, height: 0 };
-  const viewWidth = view.width * scale;
-  const viewHeight = view.height * scale;
-  if (viewWidth > 2 && viewHeight > 2) {
-    const vx = offsetX + view.x * scale;
-    const vy = offsetY + view.y * scale;
-    minimapCtx.fillStyle = 'rgba(140, 196, 255, 0.12)';
-    minimapCtx.fillRect(vx, vy, viewWidth, viewHeight);
-    minimapCtx.strokeStyle = 'rgba(173, 222, 255, 0.85)';
-    minimapCtx.lineWidth = 1;
-    minimapCtx.strokeRect(vx + 0.5, vy + 0.5, Math.max(0, viewWidth - 1), Math.max(0, viewHeight - 1));
+  if (combat?.active) {
+    ui.setStatus('Choose an action for the encounter.');
+  } else {
+    const direction = input.getDirection();
+    if (direction.x !== 0 || direction.y !== 0) {
+      ui.setStatus(`Exploring ${map.getAreaName()}...`);
+    } else {
+      ui.setStatus('Use WASD or the arrow keys to move.');
+    }
   }
+};
 
-  if (party && Array.isArray(party.members)) {
-    const baseRadius = Math.max(2, Math.min(4, 4 * scale));
-    party.members.forEach((member, index) => {
-      if (!member) return;
-      const px = offsetX + (member.x ?? 0) * scale;
-      const py = offsetY + (member.y ?? 0) * scale;
-      const radius = index === party.leaderIndex ? baseRadius + 1 : baseRadius;
-      minimapCtx.beginPath();
-      minimapCtx.arc(px, py, radius, 0, Math.PI * 2);
-      minimapCtx.fillStyle = index === party.leaderIndex ? '#ffd76f' : '#7ec8ff';
-      minimapCtx.fill();
-      minimapCtx.lineWidth = 1;
-      minimapCtx.strokeStyle = 'rgba(6, 12, 18, 0.85)';
-      minimapCtx.stroke();
-    });
-  }
-
-  minimapCtx.restore();
-}
-
-function render() {
+const render = () => {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const shake = Fx.getShakeOffset();
-  const cameraView = {
-    ...camera,
-    x: camera.x + shake.x,
-    y: camera.y + shake.y
-  };
-  drawWorld(ctx, world, cameraView);
-  drawParty(ctx, party, cameraView);
-  Fx.draw(ctx);
-  drawMinimap(world, party, camera);
-}
+  renderer.draw(ctx, map, player);
+  if (minimapCtx) {
+    renderer.drawMinimap(minimapCtx, map, player);
+  }
+};
 
 let lastTime = performance.now();
 
-function frame(now) {
-  const dt = Math.min((now - lastTime) / 1000, 0.25);
-  lastTime = now;
+const frame = (time) => {
+  const dt = Math.min((time - lastTime) / 1000, 0.25);
+  lastTime = time;
   update(dt);
   render();
   requestAnimationFrame(frame);
-}
+};
 
-async function init() {
-  await world.ready;
-  party.placeAt(world.spawn.x, world.spawn.y);
-  const terrainInfo = world.terrainAtWorld();
-  updateTerrain(terrainInfo?.name ?? '-');
-  ui.setActiveDestination?.(currentRoomId);
-  updateCamera(true);
-  lastTime = performance.now();
+const boot = () => {
+  initTooltips({ selector: '.action-btn,[data-tip]' });
+  const saved = saveManager.load();
+  if (!loadGameFromData(saved)) {
+    characterCreator.show();
+  }
   requestAnimationFrame(frame);
-}
+};
 
-init();
+boot();
 
 window.addEventListener('beforeunload', () => input.destroy());
+
