@@ -285,6 +285,83 @@ button:active {
   filter: brightness(0.95);
 }
 
+.panel.combat {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.combat-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #9abef7;
+}
+
+.combat-commands {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.combat-commands .combat-action {
+  flex: 1 1 48%;
+  min-width: 120px;
+}
+
+.combat-enemies {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.combat-enemy {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(18, 34, 54, 0.75);
+  border: 1px solid rgba(120, 168, 220, 0.15);
+  color: #e9f3ff;
+  text-align: left;
+  gap: 12px;
+}
+
+.combat-enemy .name {
+  font-weight: 600;
+}
+
+.combat-enemy .hp {
+  font-size: 12px;
+  color: #9ac4ff;
+}
+
+.combat-enemy.selected {
+  border-color: rgba(255, 216, 120, 0.6);
+  box-shadow: 0 0 0 1px rgba(255, 216, 120, 0.35);
+}
+
+.combat-enemy.defeated {
+  opacity: 0.6;
+  border-color: rgba(160, 72, 72, 0.45);
+}
+
+.combat-enemy.defeated .hp {
+  color: #f3a7a7;
+}
+
+.combat-empty {
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(16, 28, 44, 0.7);
+  text-align: center;
+  font-size: 13px;
+  color: #a7b8d8;
+}
+
 .log {
   flex: 1 1 auto;
   display: flex;
