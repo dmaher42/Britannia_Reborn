@@ -10,6 +10,9 @@ import { drawCharacterModel } from './character-models.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
+const minimapCanvas = document.getElementById('minimap');
+const minimapCtx = minimapCanvas?.getContext('2d') ?? null;
+const minimapState = { width: 0, height: 0, padding: 12 };
 
 const world = createDemoWorld();
 
@@ -191,6 +194,19 @@ ui.showToast('Castle Britannia opens new wings to explore. Select a destination 
 const camera = { x: 0, y: 0, width: 0, height: 0, deadzone: { width: 320, height: 220 } };
 const deviceRatio = Math.min(window.devicePixelRatio || 1, 2);
 
+function resizeMinimap() {
+  if (!minimapCanvas || !minimapCtx) return;
+  const rect = minimapCanvas.getBoundingClientRect();
+  const width = rect.width || minimapCanvas.clientWidth || minimapCanvas.width || 0;
+  const height = rect.height || minimapCanvas.clientHeight || minimapCanvas.height || 0;
+  minimapState.width = width;
+  minimapState.height = height;
+  minimapCanvas.width = Math.max(1, Math.round(width * deviceRatio));
+  minimapCanvas.height = Math.max(1, Math.round(height * deviceRatio));
+  minimapCtx.setTransform(deviceRatio, 0, 0, deviceRatio, 0, 0);
+  minimapCtx.imageSmoothingEnabled = false;
+}
+
 function resize() {
   const rect = canvas.getBoundingClientRect();
   canvas.width = rect.width * deviceRatio;
@@ -198,6 +214,7 @@ function resize() {
   ctx.setTransform(deviceRatio, 0, 0, deviceRatio, 0, 0);
   camera.width = rect.width;
   camera.height = rect.height;
+  resizeMinimap();
   updateCamera(true);
 }
 
@@ -364,10 +381,130 @@ function drawParty(ctx, party, cam) {
   });
 }
 
+function drawMinimap(world, party, cam) {
+  if (!minimapCtx || !minimapCanvas) return;
+  const { width, height, padding } = minimapState;
+  if (!width || !height) return;
+
+  minimapCtx.save();
+  minimapCtx.setTransform(deviceRatio, 0, 0, deviceRatio, 0, 0);
+  minimapCtx.clearRect(0, 0, minimapCanvas.width, minimapCanvas.height);
+
+  minimapCtx.fillStyle = 'rgba(5, 12, 20, 0.92)';
+  minimapCtx.fillRect(0, 0, width, height);
+
+  const room = world.currentRoom;
+  if (!room) {
+    minimapCtx.restore();
+    return;
+  }
+
+  const boundsWidth = room.bounds?.width ?? world.width ?? 0;
+  const boundsHeight = room.bounds?.height ?? world.height ?? 0;
+  if (!(boundsWidth > 0) || !(boundsHeight > 0)) {
+    minimapCtx.restore();
+    return;
+  }
+
+  const safePadding = typeof padding === 'number' ? Math.max(0, padding) : 0;
+  const availableWidth = Math.max(1, width - safePadding * 2);
+  const availableHeight = Math.max(1, height - safePadding * 2);
+  const scaleCandidate = Math.min(availableWidth / boundsWidth, availableHeight / boundsHeight);
+  const scale = Number.isFinite(scaleCandidate) && scaleCandidate > 0 ? scaleCandidate : 1;
+  const offsetX = (width - boundsWidth * scale) / 2;
+  const offsetY = (height - boundsHeight * scale) / 2;
+
+  const drawRect = (rect, minSize = 2) => {
+    if (!rect) return;
+    const x = rect.x ?? 0;
+    const y = rect.y ?? 0;
+    const rawWidth = (rect.width ?? rect.w ?? 0) * scale;
+    const rawHeight = (rect.height ?? rect.h ?? 0) * scale;
+    const drawWidth = Math.max(minSize, rawWidth);
+    const drawHeight = Math.max(minSize, rawHeight);
+    const px = offsetX + x * scale + (rawWidth - drawWidth) / 2;
+    const py = offsetY + y * scale + (rawHeight - drawHeight) / 2;
+    minimapCtx.fillRect(px, py, drawWidth, drawHeight);
+  };
+
+  const mapWidth = boundsWidth * scale;
+  const mapHeight = boundsHeight * scale;
+  minimapCtx.fillStyle = 'rgba(46, 96, 74, 0.72)';
+  minimapCtx.fillRect(offsetX, offsetY, mapWidth, mapHeight);
+  if (mapWidth > 2 && mapHeight > 2) {
+    minimapCtx.strokeStyle = 'rgba(156, 208, 255, 0.35)';
+    minimapCtx.lineWidth = 1.5;
+    minimapCtx.strokeRect(offsetX + 0.75, offsetY + 0.75, mapWidth - 1.5, mapHeight - 1.5);
+  }
+
+  if (Array.isArray(room.obstacles)) {
+    for (const obstacle of room.obstacles) {
+      const type = typeof obstacle?.type === 'string' ? obstacle.type.toLowerCase() : '';
+      if (type === 'water') {
+        minimapCtx.fillStyle = 'rgba(58, 132, 188, 0.7)';
+      } else {
+        minimapCtx.fillStyle = 'rgba(18, 32, 26, 0.82)';
+      }
+      drawRect(obstacle, 2.4);
+    }
+  }
+
+  if (Array.isArray(room.props)) {
+    for (const prop of room.props) {
+      const type = typeof prop?.type === 'string' ? prop.type.toLowerCase() : '';
+      let color = 'rgba(86, 142, 112, 0.7)';
+      if (type === 'lantern' || type === 'brazier') {
+        color = 'rgba(255, 212, 132, 0.78)';
+      } else if (type === 'banner') {
+        color = 'rgba(198, 104, 98, 0.68)';
+      } else if (type === 'tent' || type === 'crate') {
+        color = 'rgba(196, 152, 108, 0.68)';
+      } else if (type === 'tree') {
+        color = 'rgba(72, 136, 94, 0.68)';
+      }
+      minimapCtx.fillStyle = color;
+      drawRect(prop, 2);
+    }
+  }
+
+  const view = cam ?? { x: 0, y: 0, width: 0, height: 0 };
+  const viewWidth = view.width * scale;
+  const viewHeight = view.height * scale;
+  if (viewWidth > 2 && viewHeight > 2) {
+    const vx = offsetX + view.x * scale;
+    const vy = offsetY + view.y * scale;
+    minimapCtx.fillStyle = 'rgba(140, 196, 255, 0.12)';
+    minimapCtx.fillRect(vx, vy, viewWidth, viewHeight);
+    minimapCtx.strokeStyle = 'rgba(173, 222, 255, 0.85)';
+    minimapCtx.lineWidth = 1;
+    minimapCtx.strokeRect(vx + 0.5, vy + 0.5, Math.max(0, viewWidth - 1), Math.max(0, viewHeight - 1));
+  }
+
+  if (party && Array.isArray(party.members)) {
+    const baseRadius = Math.max(2, Math.min(4, 4 * scale));
+    party.members.forEach((member, index) => {
+      if (!member) return;
+      const px = offsetX + (member.x ?? 0) * scale;
+      const py = offsetY + (member.y ?? 0) * scale;
+      const radius = index === party.leaderIndex ? baseRadius + 1 : baseRadius;
+      minimapCtx.beginPath();
+      minimapCtx.arc(px, py, radius, 0, Math.PI * 2);
+      minimapCtx.fillStyle = index === party.leaderIndex ? '#ffd76f' : '#7ec8ff';
+      minimapCtx.fill();
+      minimapCtx.lineWidth = 1;
+      minimapCtx.strokeStyle = 'rgba(6, 12, 18, 0.85)';
+      minimapCtx.stroke();
+    });
+  }
+
+  minimapCtx.restore();
+}
+
 function render() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   drawWorld(ctx, world, camera);
   drawParty(ctx, party, camera);
+  drawMinimap(world, party, camera);
 }
 
 let lastTime = performance.now();
