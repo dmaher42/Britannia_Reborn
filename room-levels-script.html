@@ -1,5 +1,7 @@
 <script>
 // ==================== ROOM DEFINITIONS ====================
+// Rooms can be authored inline or loaded from external JSON files.
+// Each room follows the shape: { spawn: {x, y}, obstacles: [...], props: [...] }
 const rooms = {
   room1: {
     spawn: { x: 112, y: 112 },
@@ -42,16 +44,14 @@ if (roomOrder.length === 0) {
 let currentRoomIndex = 0;
 let currentRoom = null;
 
+// ==================== CANVAS & PLAYER SETUP ====================
 const canvas = document.getElementById('game');
 if (!canvas) {
   throw new Error('Expected a <canvas id="game"> element in the document.');
 }
-if (!canvas.width) {
-  canvas.width = 640;
-}
-if (!canvas.height) {
-  canvas.height = 360;
-}
+if (!canvas.width) canvas.width = 640;
+if (!canvas.height) canvas.height = 360;
+
 const ctx = canvas.getContext('2d');
 ctx.imageSmoothingEnabled = false;
 
@@ -66,37 +66,35 @@ const player = {
 const movementKeys = new Set(['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd']);
 const heldKeys = Object.create(null);
 
+// Active state for the currently loaded room.
 const activeObstacles = [];
 const activeProps = [];
 
+// ==================== RENDERING HELPERS ====================
 const obstacleColors = {
-  tree: '#3f8f3f',
   wall: '#7b7f83',
+  tree: '#3f8f3f',
   rock: '#6a5745',
   water: '#3d6fa4'
 };
-
 const placeholderPropFill = '#d8ceb4';
 const placeholderPropStroke = '#6b5d43';
 
+// ==================== PLAYER SPRITE LOADING ====================
 const playerImage = new Image();
 playerImage.src = '/assets/player.png';
 let playerSpriteReady = false;
 let loopStarted = false;
 
-playerImage.addEventListener('load', () => {
-  playerSpriteReady = true;
+function handlePlayerSpriteReady() {
+  playerSpriteReady = playerImage.complete && playerImage.naturalWidth !== 0;
   startGameLoop();
-});
+}
 
-playerImage.addEventListener('error', () => {
-  playerSpriteReady = false;
-  startGameLoop();
-});
-
+playerImage.addEventListener('load', handlePlayerSpriteReady);
+playerImage.addEventListener('error', handlePlayerSpriteReady);
 if (playerImage.complete && playerImage.naturalWidth !== 0) {
-  playerSpriteReady = true;
-  startGameLoop();
+  handlePlayerSpriteReady();
 }
 
 let lastTime = 0;
@@ -114,6 +112,8 @@ function loadRoom(roomData) {
   if (!roomData) return;
 
   currentRoom = roomData;
+
+  // Reset previous room state.
   activeObstacles.length = 0;
   activeProps.length = 0;
 
@@ -121,13 +121,11 @@ function loadRoom(roomData) {
   player.x = spawn.x;
   player.y = spawn.y;
 
-  const obstacleList = roomData.obstacles || [];
-  obstacleList.forEach((obstacle) => {
+  (roomData.obstacles || []).forEach((obstacle) => {
     activeObstacles.push({ ...obstacle });
   });
 
-  const propList = roomData.props || [];
-  propList.forEach((propData) => {
+  (roomData.props || []).forEach((propData) => {
     const prop = {
       x: propData.x,
       y: propData.y,
@@ -187,6 +185,7 @@ window.addEventListener('keyup', (event) => {
   }
 });
 
+// ==================== GAME LOOP ====================
 function update(deltaTime) {
   let moveX = 0;
   let moveY = 0;
