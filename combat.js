@@ -49,6 +49,58 @@ export class CombatSystem {
     }
   }
 
+  _fxIdFor(side, entity) {
+    if (!entity) return null;
+    if (typeof entity.id === 'string' && entity.id.length > 0) return entity.id;
+    if (side === 'party' && Array.isArray(this.party?.members)) {
+      const index = this.party.members.indexOf(entity);
+      if (index >= 0) return entity.name ?? `party-${index}`;
+    }
+    if (side === 'enemy' && Array.isArray(this.enemies)) {
+      const index = this.enemies.indexOf(entity);
+      if (index >= 0) return entity.name ?? `enemy-${index + 1}`;
+    }
+    return entity.name ?? null;
+  }
+
+  _positionOf(entity) {
+    const x = entity?.x;
+    const y = entity?.y;
+    if (Number.isFinite(x) && Number.isFinite(y)) {
+      return { x, y };
+    }
+    return null;
+  }
+
+  _emitHitEvent({ amount = 0, target = null, attacker = null, source = 'party', targetSide = 'enemy', cause = 'attack', spellId = null, crit = false, kind = 'damage', result = null } = {}) {
+    const cleaned = Number.isFinite(amount) ? Math.max(0, amount) : 0;
+    const payload = {
+      amount: Math.round(cleaned),
+      cause,
+      source,
+      targetSide,
+      targetId: target?.id ?? null,
+      targetName: target?.name ?? target?.id ?? '',
+      attackerId: attacker?.id ?? null,
+      attackerName: attacker?.name ?? attacker?.id ?? '',
+      targetEntityId: this._fxIdFor(targetSide, target),
+      attackerEntityId: this._fxIdFor(source === 'party' ? 'party' : 'enemy', attacker),
+      targetPosition: this._positionOf(target),
+      attackerPosition: this._positionOf(attacker),
+      target: target
+        ? { id: target.id, name: target.name, hp: roundStat(target.hp, target.hpMax), hpMax: roundStat(target.hpMax, target.hp), x: target.x, y: target.y }
+        : null,
+      attacker: attacker
+        ? { id: attacker.id, name: attacker.name, hp: roundStat(attacker.hp, attacker.hpMax), hpMax: roundStat(attacker.hpMax, attacker.hp), x: attacker.x, y: attacker.y }
+        : null,
+      spellId: spellId ?? null,
+      crit: !!crit,
+      kind,
+      result: result ?? (cleaned > 0 ? 'hit' : 'block')
+    };
+    this._emit('hit', payload);
+  }
+
   getState() {
     return {
       active: this.active,
@@ -154,6 +206,7 @@ export class CombatSystem {
       this._emit('log', `${target.name} is defeated!`);
     }
 
+    this._emitHitEvent({ amount: actualDamage, target, attacker, source: 'party', targetSide: 'enemy', cause: 'attack', kind: 'damage' });
     this._emit('state', this.getState());
     if (this._checkVictory()) {
       return { success: true, damage: actualDamage, targetId: target.id, defeated: true };
@@ -218,6 +271,7 @@ export class CombatSystem {
       this._emit('log', `${target.name} is reduced to smoldering embers.`);
     }
 
+    this._emitHitEvent({ amount: actualDamage, target, attacker: caster, source: 'party', targetSide: 'enemy', cause: 'spell', spellId, kind: 'damage' });
     this._emit('state', this.getState());
     if (this._checkVictory()) {
       return { success: true, damage: actualDamage, targetId: target.id, defeated: true, spell: spellId };
@@ -299,6 +353,7 @@ export class CombatSystem {
       if (target.hp <= 0) {
         this._emit('log', `${target.name} falls unconscious!`);
       }
+      this._emitHitEvent({ amount: actualDamage, target, attacker: enemy, source: 'enemy', targetSide: 'party', cause: 'attack', kind: 'damage' });
       if (this._checkDefeat()) {
         this._pendingEnemyActions = [];
         return;

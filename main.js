@@ -7,6 +7,7 @@ import { InputController } from './controls.js';
 import { setupUI } from './ui.js';
 import { clamp } from './utils.js';
 import { drawCharacterModel } from './character-models.js';
+import * as Fx from './public/fx/Fx.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -193,6 +194,10 @@ const ui = setupUI({
 });
 
 combat.onEvent((event, payload) => {
+  if (event === 'hit') {
+    handleCombatHitFx(payload);
+    return;
+  }
   if (event !== 'complete') return;
   const victory = !!payload?.victory;
   const rewards = payload?.rewards ?? { xp: 0, gold: 0 };
@@ -223,6 +228,17 @@ ui.showToast('Castle Britannia opens new wings to explore. Select a destination 
 
 const camera = { x: 0, y: 0, width: 0, height: 0, deadzone: { width: 320, height: 220 } };
 const deviceRatio = Math.min(window.devicePixelRatio || 1, 2);
+
+Fx.init({
+  getCamera: () => ({ x: camera.x, y: camera.y, width: camera.width, height: camera.height }),
+  worldToScreen: ({ x, y }) => {
+    const shake = Fx.getShakeOffset();
+    return {
+      sx: Math.round(x - camera.x - shake.x),
+      sy: Math.round(y - camera.y - shake.y)
+    };
+  }
+});
 
 function resizeMinimap() {
   if (!minimapCanvas || !minimapCtx) return;
@@ -286,6 +302,79 @@ function updateTerrain(name) {
   if (name !== lastTerrain) {
     ui.setTerrain(name);
     lastTerrain = name;
+  }
+}
+
+function handleCombatHitFx(payload) {
+  if (!payload) return;
+  const rawAmount = Number.isFinite(payload.amount) ? payload.amount : 0;
+  const amount = Math.max(0, Math.round(rawAmount));
+  const result = typeof payload.result === 'string' ? payload.result.toLowerCase() : amount > 0 ? 'hit' : 'block';
+  const isHeal = payload.kind === 'heal' || payload.cause === 'heal';
+  const isMiss = result === 'miss';
+  const isBlock = result === 'block' || amount <= 0;
+  let kind;
+  let text;
+  if (isHeal) {
+    kind = 'heal';
+    text = `+${amount}`;
+  } else if (isMiss) {
+    kind = 'miss';
+    text = 'Miss';
+  } else if (isBlock) {
+    kind = 'block';
+    text = 'Block';
+  } else {
+    kind = 'dmg';
+    text = `-${amount}`;
+  }
+
+  const spawn = { text, kind, crit: !!payload.crit };
+  const worldTarget = payload.targetPosition && Number.isFinite(payload.targetPosition.x) && Number.isFinite(payload.targetPosition.y)
+    ? payload.targetPosition
+    : (payload.target && Number.isFinite(payload.target.x) && Number.isFinite(payload.target.y)
+        ? { x: payload.target.x, y: payload.target.y }
+        : null);
+
+  if (worldTarget) {
+    spawn.x = worldTarget.x;
+    spawn.y = worldTarget.y - 20;
+    spawn.space = 'world';
+  } else {
+    const fallback = payload.attackerPosition && Number.isFinite(payload.attackerPosition.x) && Number.isFinite(payload.attackerPosition.y)
+      ? payload.attackerPosition
+      : null;
+    if (fallback) {
+      const offsetX = payload.targetSide === 'enemy' ? 26 : 0;
+      spawn.x = fallback.x + offsetX;
+      spawn.y = fallback.y - 24;
+      spawn.space = 'world';
+    } else {
+      const cssWidth = camera.width || (canvas.width / deviceRatio) || canvas.width || 640;
+      const cssHeight = camera.height || (canvas.height / deviceRatio) || canvas.height || 360;
+      spawn.space = 'screen';
+      spawn.x = cssWidth / 2;
+      spawn.y = Math.max(48, cssHeight * 0.25);
+    }
+  }
+
+  Fx.spawnFloaty(spawn);
+
+  if (payload.targetEntityId) {
+    if (kind === 'heal') {
+      Fx.flashTarget(payload.targetEntityId, { color: 'rgba(130,255,176,0.85)', ms: 160 });
+    } else if (kind !== 'miss') {
+      const color = payload.targetSide === 'party' ? 'rgba(255,150,120,0.9)' : 'rgba(255,232,160,0.9)';
+      Fx.flashTarget(payload.targetEntityId, { color, ms: 140 });
+    }
+  }
+
+  if (kind === 'dmg' && amount > 0) {
+    const base = payload.targetSide === 'party' ? 7 : 4;
+    const amplitude = Math.min(14, base + amount * 0.12);
+    Fx.shake({ duration: Math.min(260, 120 + amount * 3), amplitude, frequency: 26, falloff: 1.15 });
+  } else if (kind === 'block') {
+    Fx.shake({ duration: 140, amplitude: 3, frequency: 20, falloff: 1.8 });
   }
 }
 
@@ -372,6 +461,7 @@ function update(dt) {
   const direction = inCombat ? { x: 0, y: 0 } : input.getDirection();
   party.update(dt, world, direction);
   combat.update(dt);
+  Fx.update(dt);
   updateCamera();
 
   const leader = party.leader;
@@ -397,6 +487,9 @@ function update(dt) {
 function drawParty(ctx, party, cam) {
   const radius = 19;
   party.members.forEach((member, index) => {
+    if (!member) return;
+    const fxId = member.id ?? member.name ?? `party-${index}`;
+    Fx.registerEntityBounds(fxId, { x: member.x, y: member.y, radius });
     const sx = member.x - cam.x;
     const sy = member.y - cam.y;
     drawCharacterModel(ctx, member, {
@@ -539,8 +632,11 @@ function drawMinimap(world, party, cam) {
 
 function render() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  drawWorld(ctx, world, camera);
-  drawParty(ctx, party, camera);
+  const shake = Fx.getShakeOffset();
+  const cameraWithShake = { ...camera, x: camera.x + shake.x, y: camera.y + shake.y };
+  drawWorld(ctx, world, cameraWithShake);
+  drawParty(ctx, party, cameraWithShake);
+  Fx.draw(ctx);
   drawMinimap(world, party, camera);
 }
 
