@@ -2,207 +2,52 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Project: Britannia Reborn — Prototype</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Britannia Reborn — Movement Prototype</title>
   <link rel="stylesheet" href="style.css" />
-  <script type="importmap">
-    {
-      "imports": {
-        "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
-      }
-    }
-  </script>
 </head>
 <body>
-  <div id="root" tabindex="0">
-    <canvas id="sky"></canvas>
-    <canvas id="back"></canvas>
-    <canvas id="game" tabindex="0"></canvas>
-    <div id="focusOverlay">Click the game to focus (WASD / Arrows)</div>
-    <canvas id="fx"></canvas>
-    <svg class="gridOverlay" id="gridOverlay"></svg>
-    <div class="vignette"></div>
-
-    <div class="hud">
-      <div class="topbar">
-        <div class="left">
-          <button class="btn" id="btnTalk">Talk</button>
-          <button class="btn" id="btnCombat">Start Combat</button>
-          <button class="btn" id="btnCast">Cast: Fire Dart</button>
-          <button class="btn" id="btnEndTurn" disabled>End Turn</button>
-        </div>
-        <div class="right">
-          <div class="pill" id="terrainPill">Terrain: Road</div>
-          <label class="pill" style="display:flex;gap:8px;align-items:center;padding-right:12px">
-            <input type="checkbox" id="bloom" style="accent-color:#52c8ff"> Bloom
-          </label>
-        </div>
+  <div class="layout">
+    <main class="playfield">
+      <canvas id="game" aria-label="World view"></canvas>
+      <div class="overlay" aria-live="polite">
+        <div id="statusText" class="status">Use WASD or the arrow keys to explore.</div>
+        <div id="terrainLabel" class="terrain">Terrain: -</div>
       </div>
-
-      <div class="panel">
-        <div class="card glow" id="partyCard">
-          <h3>Party</h3>
-          <div id="partyList"></div>
+    </main>
+    <aside class="sidebar" aria-label="Party and inventory">
+      <section class="panel">
+        <header>
+          <h2>Party</h2>
+        </header>
+        <ul id="partyList" class="party-list" aria-live="polite"></ul>
+      </section>
+      <section class="panel">
+        <header>
+          <h2>Inventory</h2>
+        </header>
+        <div class="inventory-meta">
+          <div><span>Total weight</span><span id="inventoryWeight">0</span></div>
+          <div><span>Gold</span><span id="inventoryGold">0</span></div>
         </div>
-
-        <div class="card" id="packCard">
-          <h3>Shared Inventory</h3>
-          <div class="row"><div>Equipped (per-char)</div><div id="equipRule">equip ≤ STR</div></div>
-          <div class="row"><div>Backpack (per-char)</div><div id="packRule">pack ≤ STR×2</div></div>
-          <div class="row"><div>Reagents</div><div id="reagents">-</div></div>
-          <div class="row"><div>Total Weight</div><div id="totalWeight">-</div></div>
-          <div class="row"><div>Gold</div><div id="gold">125</div></div>
-          <div class="row"><button class="btn" id="btnAddLoot">Add Demo Loot</button></div>
+        <div id="inventoryList" class="inventory-list"></div>
+      </section>
+      <section class="panel actions">
+        <header><h2>Actions</h2></header>
+        <div class="button-row">
+          <button id="btnTalk" type="button">Talk</button>
+          <button id="btnCast" type="button">Cast Fire Dart</button>
+          <button id="btnCombat" type="button">Start Skirmish</button>
+          <button id="btnAddLoot" type="button">Add Loot</button>
         </div>
-      </div>
-    </div>
-
-    <div class="dialogue" id="dialogue"></div>
-    <div class="toast" id="toast" style="display:none"></div>
-    <div class="watermark">Local ES‑Modules Prototype — AI optional via server</div>
+      </section>
+      <section class="panel log" aria-live="polite">
+        <header><h2>Journal</h2></header>
+        <div id="log" class="log-entries"></div>
+      </section>
+    </aside>
   </div>
-
-  <script>
-    (() => {
-      const BUILD_TAG = '3';
-      window.__BR_BUILD_TAG = BUILD_TAG;
-      const root = document.getElementById('root') || document.body;
-      const showBootError = (message, error) => {
-        console.error('[Boot]', message, error);
-        const overlayId = 'boot-error-overlay';
-        let overlay = document.getElementById(overlayId);
-        if (!overlay) {
-          overlay = document.createElement('div');
-          overlay.id = overlayId;
-          overlay.style.position = 'fixed';
-          overlay.style.inset = '0';
-          overlay.style.zIndex = '2000';
-          overlay.style.background = 'rgba(5, 10, 22, 0.94)';
-          overlay.style.display = 'flex';
-          overlay.style.flexDirection = 'column';
-          overlay.style.alignItems = 'center';
-          overlay.style.justifyContent = 'center';
-          overlay.style.padding = '32px';
-          overlay.style.textAlign = 'center';
-          overlay.style.color = '#fff';
-          overlay.style.fontFamily = 'Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial';
-          overlay.style.gap = '16px';
-          (root || document.body).appendChild(overlay);
-        }
-
-        overlay.replaceChildren();
-        const title = document.createElement('h2');
-        title.textContent = 'Unable to start Britannia Reborn';
-        overlay.appendChild(title);
-
-        const messageEl = document.createElement('p');
-        messageEl.textContent = message;
-        overlay.appendChild(messageEl);
-
-        if (error) {
-          const details = document.createElement('pre');
-          details.textContent = (error && error.stack) || String(error);
-          details.style.maxWidth = '680px';
-          details.style.maxHeight = '240px';
-          details.style.overflow = 'auto';
-          details.style.margin = '0';
-          details.style.textAlign = 'left';
-          details.style.background = 'rgba(0, 0, 0, 0.45)';
-          details.style.padding = '16px';
-          details.style.borderRadius = '12px';
-          overlay.appendChild(details);
-        }
-
-        const hint = document.createElement('p');
-        hint.textContent = 'Please check your connection and reload the page. If the issue persists, see the browser console for details or try adding ?dev=1 to the URL to reset cached files.';
-        overlay.appendChild(hint);
-      };
-
-      window.__britanniaShowBootError = showBootError;
-
-      const importMapSupported = typeof HTMLScriptElement === 'undefined'
-        || typeof HTMLScriptElement.supports !== 'function'
-        || HTMLScriptElement.supports('importmap');
-
-      if (!importMapSupported) {
-        showBootError('This browser does not support import maps, which are required to load the Britannia Reborn engine.', new Error('Import maps unsupported'));
-      }
-
-      window.__BR_CAN_BOOT = importMapSupported;
-
-      window.addEventListener('error', (event) => {
-        const target = event.target;
-        if (target && target.tagName === 'SCRIPT') {
-          showBootError(`Failed to load ${target.src || 'a required script'}.`, event.error || event.message);
-        }
-      }, true);
-
-      window.addEventListener('unhandledrejection', (event) => {
-        showBootError('A critical error occurred while starting the game.', event.reason);
-      });
-    })();
-  </script>
-
-  <script type="module" id="game-script">
-    const showBootError = window.__britanniaShowBootError || ((message, error) => console.error(message, error));
-    const canBoot = window.__BR_CAN_BOOT !== false;
-    // buildTag is provided by the boot script above via __BR_BUILD_TAG
-    const buildTag = window.__BR_BUILD_TAG || '3';
-
-    if (canBoot) {
-      const moduleUrl = new URL('./main.js', import.meta.url);
-      const pageParams = new URLSearchParams(window.location.search);
-      const forcedVersion = pageParams.get('v');
-      if (forcedVersion) {
-        moduleUrl.searchParams.set('v', forcedVersion);
-      } else {
-        moduleUrl.searchParams.set('v', buildTag);
-      }
-
-      import(moduleUrl.href).catch((error) => {
-        showBootError('Failed to load the game module.', error);
-      });
-    } else {
-      console.warn('Britannia Reborn boot aborted: missing browser features.');
-    }
-  </script>
-
-  <script type="module">
-    // Dev escape hatch: disable & unregister SW with ?dev=1
-    const params = new URLSearchParams(location.search);
-    const isDev = params.get('dev') === '1';
-    // Use a fixed build tag so the service worker file path doesn't change on
-    // every page load, which would trigger perpetual reloads. Bump this value
-    // when the service worker itself changes to force an update.
-    const buildTag = window.__BR_BUILD_TAG || '3';
-
-    if ('serviceWorker' in navigator) {
-      if (isDev) {
-        navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister()));
-        console.info('[SW] Unregistered for dev (use ?dev=1).');
-      } else {
-        navigator.serviceWorker.register('./service-worker.js?v=' + buildTag).then(reg => {
-          if (reg.waiting) reg.waiting.postMessage('SKIP_WAITING');
-          reg.addEventListener('updatefound', () => {
-            const sw = reg.installing;
-            if (!sw) return;
-            sw.addEventListener('statechange', () => {
-              if (sw.state === 'installed' && navigator.serviceWorker.controller) {
-                sw.postMessage('SKIP_WAITING');
-              }
-            });
-          });
-        }).catch(err => {
-          console.warn('[SW] Registration failed; continuing without offline support.', err);
-        });
-
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-          location.reload();
-        });
-      }
-    }
-
-  </script>
-
+  <div id="toast" class="toast" hidden role="status" aria-live="assertive"></div>
+  <script type="module" src="./main.js"></script>
 </body>
 </html>

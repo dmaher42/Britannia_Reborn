@@ -1,244 +1,199 @@
-import { drawSky, drawWorld, TERRAIN, TILE } from './world.js';
+import { createDemoWorld, drawWorld } from './world.js';
 import { Party, CharacterClass } from './party.js';
 import { Inventory } from './inventory.js';
 import { Spellbook, castFireDart } from './spells.js';
 import { CombatSystem } from './combat.js';
-import { pushBubble, pushActions, showToast, updatePartyUI, updateInventoryUI, gridLayer } from './ui.js';
-import { talkToNPC } from './ai.js';
+import { InputController } from './controls.js';
+import { setupUI } from './ui.js';
+import { clamp } from './utils.js';
 
-const dpr = Math.min(window.devicePixelRatio||1, 2);
-const skyC = document.getElementById('sky'), sky = skyC.getContext('2d');
-const backC = document.getElementById('back'), back = backC.getContext('2d');
-const gameC = document.getElementById('game'), ctx = gameC.getContext('2d',{alpha:false});
-const fxC = document.getElementById('fx'), fx = fxC.getContext('2d');
-console.info('main.js loaded', {dpr, w: innerWidth, h: innerHeight});
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
 
-// The editor preview sometimes injects a wrapper script (frame.bundle.js)
-// which can throw an unhandled promise rejection referencing `selectedText`.
-// That's external to this app; swallow that specific error to avoid noisy
-// console output while keeping other errors visible.
-window.addEventListener('unhandledrejection', (ev)=>{
-  try{
-    const r = ev && ev.reason;
-    if(r && typeof r.message === 'string' && r.message.includes('selectedText')){
-      ev.preventDefault();
-      console.warn('Suppressed preview wrapper unhandled rejection:', r && r.message);
-      return;
-    }
-  }catch(_){/* ignore */}
-  // leave other rejections alone so they surface normally
-});
+const world = createDemoWorld();
 
-// Also catch global runtime errors coming from the editor preview wrapper
-// (frame.bundle.js). Those are external to the app; suppress the known
-// 'selectedText' noise and keep other errors visible.
-window.addEventListener('error', (e)=>{
-  try{
-    const src = e && (e.filename || (e.error && e.error.fileName));
-    const msg = e && (e.message || (e.error && e.error.message));
-    if(src && src.includes('frame.bundle.js')){
-      // suppress this external wrapper's errors
-      console.warn('Suppressed preview wrapper error from', src, ':', msg);
-      e.preventDefault && e.preventDefault();
-      return true;
-    }
-    // Heuristic: some errors reference selectedText in the message
-    if(msg && typeof msg === 'string' && msg.includes('selectedText')){
-      console.warn('Suppressed selectedText error (likely preview wrapper):', msg);
-      e.preventDefault && e.preventDefault();
-      return true;
-    }
-  }catch(_){/* ignore */}
-  // otherwise let the error bubble through
-  return false;
-});
-function sizeCanvas(c){ c.width = innerWidth * dpr; c.height = innerHeight * dpr; c.style.width = innerWidth+'px'; c.style.height = innerHeight+'px'; c.getContext('2d').setTransform(dpr,0,0,dpr,0,0); }
-function onResize(){ [skyC,backC,gameC,fxC].forEach(sizeCanvas); }
-addEventListener('resize', onResize); onResize();
-
-let camX = -innerWidth/2, camY = -innerHeight/2;
-let heroMarkerVisible = true;
-let _loggedBoot = false;
-
-const party = new Party([
-  { name:'Avatar', cls:CharacterClass.Avatar, STR:12, DEX:10, INT:9, hpMax:30, mpClass:true },
-  { name:'Iolo', cls:CharacterClass.Bard, STR:9, DEX:12, INT:8,  hpMax:22 },
-  { name:'Shamino', cls:CharacterClass.Ranger, STR:11, DEX:12, INT:10, hpMax:24 }
-]);
-
-// place party near screen center so leader is visible at boot
-function placePartyAtScreenCenter(){
-  const cx = innerWidth/2;
-  const cy = innerHeight/2;
-  const mid = (party.members.length - 1) / 2;
-  party.members.forEach((m,i)=>{
-    m.x = cx + (i - mid) * 28; // small side-by-side offsets
-    m.y = cy + (i % 2 ? 8 : -8);
-  });
-}
-placePartyAtScreenCenter();
-
-// center camera now that party exists and canvases have been sized
-function centerCameraOnLeader(){
-  if(!party.leader) return;
-  camX = party.leader.x - innerWidth/2;
-  camY = party.leader.y - innerHeight/2;
-  console.info('Boot: party size=', party.size, 'leader=', party.leader.name, 'coords=', Math.round(party.leader.x), Math.round(party.leader.y));
-}
-centerCameraOnLeader();
+const party = new Party(
+  [
+    { name: 'Avatar', cls: CharacterClass.Avatar, STR: 12, DEX: 10, INT: 10, hpMax: 32, baseSpeed: 110 },
+    { name: 'Iolo', cls: CharacterClass.Bard, STR: 9, DEX: 12, INT: 8, hpMax: 24, baseSpeed: 108 },
+    { name: 'Shamino', cls: CharacterClass.Ranger, STR: 11, DEX: 11, INT: 10, hpMax: 26, baseSpeed: 112 }
+  ],
+  { followSpacing: 42, collisionRadius: 14 }
+);
+party.placeAt(world.spawn.x, world.spawn.y);
 
 const inventory = new Inventory();
 inventory.gold = 125;
-inventory.add({ id:'sulfur_ash', name:'Sulfur Ash', weight:0.1, qty:3, tag:'reagent' });
-inventory.add({ id:'black_pearl', name:'Black Pearl', weight:0.1, qty:3, tag:'reagent' });
-inventory.add({ id:'healing_potion', name:'Potion of Healing', weight:0.2, qty:1, tag:'consumable' });
+inventory.add({ id: 'sulfur_ash', name: 'Sulfur Ash', weight: 0.1, qty: 3, tag: 'reagent' });
+inventory.add({ id: 'black_pearl', name: 'Black Pearl', weight: 0.1, qty: 3, tag: 'reagent' });
+inventory.add({ id: 'healing_potion', name: 'Healing Potion', weight: 0.3, qty: 2, tag: 'consumable' });
+party.members[0].addToBackpack({ id: 'bedroll', name: 'Bedroll', weight: 1.2, qty: 1 });
 
-const spells = new Spellbook(inventory, party);
+const spellbook = new Spellbook(inventory, party);
+const combat = new CombatSystem(party);
+const input = new InputController(window);
 
-const combat = new CombatSystem(party, inventory, spells, gameC, ctx, fx, gridLayer);
-
-const keys={};
-// prevent default scrolling for arrow keys and capture input reliably
-addEventListener('keydown', e=>{
-  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
-  keys[e.key]=true;
+const ui = setupUI({
+  party,
+  inventory,
+  spellbook,
+  combat,
+  onTalk: () => {
+    const speaker = party.leader;
+    ui.log(`${speaker.name} trades words with a wary villager.`);
+    ui.showToast('The townsfolk wish you safe travels.');
+  },
+  onCast: () => {
+    const caster = party.leader;
+    if (!spellbook.canCast('fire_dart', caster)) {
+      ui.showToast('You lack the reagents or focus for Fire Dart.');
+      return;
+    }
+    castFireDart(caster, spellbook);
+    ui.log(`${caster.name} looses a dart of flame into the twilight.`);
+    ui.refreshInventory();
+    ui.refreshParty();
+  },
+  onStartCombat: () => {
+    if (combat.startSkirmish()) {
+      ui.showToast('A skirmish erupts!');
+    } else {
+      ui.showToast('The skirmish is already underway.');
+    }
+  },
+  onAddLoot: () => {
+    inventory.add({ id: 'chain_mail', name: 'Chain Mail', weight: 6, qty: 1, equip: 'torso', tag: 'armor' });
+    inventory.add({ id: 'spider_silk', name: 'Spider Silk', weight: 0.4, qty: 2, tag: 'reagent' });
+    party.members[1].addToBackpack({ id: 'field_rations', name: 'Field Rations', weight: 0.5, qty: 2 });
+    ui.refreshInventory();
+    ui.refreshParty();
+    ui.showToast('New supplies have been stowed.');
+  }
 });
-addEventListener('keyup', e=>{ keys[e.key]=false; });
 
-// ensure the root container receives keyboard focus so it captures WASD/Arrows
-window.addEventListener('load', ()=>{ const r=document.getElementById('root'); r && r.focus(); });
+ui.log('The Avatar arrives on the outskirts of Britain.');
+ui.showToast('Welcome back to Britannia.');
 
-document.getElementById('btnTalk').onclick = async () => {
-  const npc = { name:'Britain Guard', profession:'Guard', town:'Britain', personality:'formal, dutiful' };
-  const worldState = { trinsicSiege:false, time: Date.now() };
-  const questState = party.activeQuests;
-  const playerState = { name: party.members[0].name, karma: party.karma, items: inventory.summary() };
-  pushBubble('Britain Guard', 'Halt! State thy business in Britain.');
-  const { text } = await talkToNPC(npc, worldState, playerState, questState, 'We seek news and work.');
-  pushBubble('Britain Guard', text);
-  pushActions([
-    {label:'Accept Quest', fn:()=>{ pushBubble('System','Quest Accepted: Clear bandits by the northern bridge.'); party.acceptQuest({id:'bandits_bridge', name:'Clear the Bandits'}); updatePartyUI(party);}}
-  ]);
-};
-document.getElementById('btnCombat').onclick = ()=>combat.startSkirmish();
-document.getElementById('btnCast').onclick = ()=>{
-  const caster = party.members[0];
-  if(!spells.canCast('fire_dart', caster)) return showToast('Need Sulfur Ash + Black Pearl and MP');
-  castFireDart(caster, combat, ctx, fx, inventory, spells);
-};
-document.getElementById('btnEndTurn').onclick = ()=> combat.endPlayerTurn();
-document.getElementById('btnAddLoot').onclick = ()=>{
-  inventory.add({ id:'spider_silk', name:'Spider Silk', weight:0.4, qty:5, tag:'loot' });
-  inventory.add({ id:'chain_mail', name:'Chain Mail', weight:6.0, qty:1, tag:'armor', equip:'torso', restricted:['Mage','Druid'] });
-  updateInventoryUI(inventory, party);
-};
+const camera = { x: 0, y: 0, width: 0, height: 0 };
+const deviceRatio = Math.min(window.devicePixelRatio || 1, 2);
 
-updatePartyUI(party);
-updateInventoryUI(inventory, party);
-
-// Update the terrain pill once at startup so the UI shows the current terrain
-function updateTerrainPill() {
-  const terr = TERRAIN.at(Math.floor(party.leader.x/TILE), Math.floor(party.leader.y/TILE));
-  const pill = document.getElementById('terrainPill');
-  if(pill) pill.textContent = 'Terrain: ' + terr.name;
-}
-try{ updateTerrainPill(); }catch(e){ /* UI may not be ready yet; ignore */ }
-
-// Hero Marker drawing helper
-function drawHeroMarker(ctx, view, leader){
-  if(!heroMarkerVisible || !leader) return;
-  const {camX, camY} = view;
-  const sx = leader.x - camX, sy = leader.y - camY;
-  ctx.save();
-  ctx.strokeStyle = '#8fd3ff'; ctx.lineWidth = 3; ctx.globalAlpha = 0.95;
-  ctx.beginPath(); ctx.ellipse(sx, sy+6, 22, 8, 0, 0, Math.PI*2); ctx.stroke();
-  ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(sx-28, sy-36, 56, 18);
-  ctx.fillStyle = '#bfeaff'; ctx.font = '12px sans-serif'; ctx.textAlign='center'; ctx.fillText(leader.name || 'Avatar', sx, sy-24);
-  ctx.restore();
+function resize() {
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * deviceRatio;
+  canvas.height = rect.height * deviceRatio;
+  ctx.setTransform(deviceRatio, 0, 0, deviceRatio, 0, 0);
+  camera.width = rect.width;
+  camera.height = rect.height;
 }
 
-// Dev toggle: press H to hide/show hero marker
-addEventListener('keydown', (e)=>{ if(e.key==='h' || e.key==='H'){ heroMarkerVisible = !heroMarkerVisible; console.info('Hero marker visible=', heroMarkerVisible); } });
-
-// First-move hint
-function showFirstMoveHint(){
-  const hint = document.createElement('div');
-  hint.id = 'firstMoveHint'; hint.style.position='fixed'; hint.style.left='12px'; hint.style.bottom='12px'; hint.style.padding='8px 12px';
-  hint.style.background='rgba(0,0,0,0.6)'; hint.style.color='#fff'; hint.style.borderRadius='6px'; hint.style.zIndex=9999;
-  hint.textContent = 'Use WASD/Arrows to move'; document.body.appendChild(hint);
-  setTimeout(()=>{ hint.style.transition='opacity 700ms'; hint.style.opacity='0'; setTimeout(()=>hint.remove(),800); },4000);
-}
-showFirstMoveHint();
-
-let last = performance.now();
-function loop(){
-  const now = performance.now(), dt = (now-last)/1000; last = now;
-  back.clearRect(0,0,innerWidth,innerHeight); sky.clearRect(0,0,innerWidth,innerHeight);
-  drawSky(sky, back, dt, innerWidth, innerHeight);
-
-  if(!combat.active){
-    let mvx=0,mvy=0;
-    if(keys['ArrowLeft']||keys['a']) mvx-=1;
-    if(keys['ArrowRight']||keys['d']) mvx+=1;
-    if(keys['ArrowUp']||keys['w']) mvy-=1;
-    if(keys['ArrowDown']||keys['s']) mvy+=1;
-    if(mvx||mvy){
-      const len=Math.hypot(mvx,mvy); mvx/=len; mvy/=len;
-      const terr = TERRAIN.at(Math.floor(party.leader.x/TILE), Math.floor(party.leader.y/TILE));
-      let s = party.leader.baseSpeed;
-      if(terr.key==='SWAMP'){ s*=0.7; if(Math.random()<0.02){ party.leader.applyPoison(1); } }
-      if(terr.key==='FOREST'){ s*=0.86; }
-      if(terr.key==='ROAD'){ s*=1.22; }
-      if(terr.key==='WATER'){ s*=0.5; }
-      if(terr.key==='SAND'){ s*=0.92; }
-      party.move(mvx*s*dt, mvy*s*dt);
-      updateTerrainPill();
-    }
-  } else {
-    combat.update(dt);
+function ensureCanvasSize() {
+  const parent = canvas.parentElement;
+  if (!parent) return;
+  const width = parent.clientWidth;
+  const height = parent.clientHeight;
+  if (canvas.style.width !== `${width}px` || canvas.style.height !== `${height}px`) {
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
   }
-
-  camX = party.leader.x - innerWidth/2; camY = party.leader.y - innerHeight/2;
-
-  const gameW = innerWidth, gameH = innerHeight;
-  const view = {camX, camY, W:gameW, H:gameH};
-  // Debug: draw a small red crosshair at screen center to ensure game canvas is visible
-    // normal rendering
-  const terrVisPenalty = TERRAIN.at(Math.floor(party.leader.x/TILE), Math.floor(party.leader.y/TILE)).key==='FOREST' ? .08 : 0;
-  // ensure the game canvas has a neutral dark base so characters and world
-  // elements don't vanish when tiles are very dark
-  ctx.save();
-  const g = ctx.createLinearGradient(0,0,0,gameH);
-  g.addColorStop(0, '#0c1624'); g.addColorStop(1, '#07121a');
-  ctx.fillStyle = g; ctx.fillRect(0,0,gameW,gameH); ctx.restore();
-  drawWorld(ctx, view, dt, terrVisPenalty);
-  // leader highlight removed (debugging only)
-  // Draw world then party (ensure leader visible)
-  try{
-    if(!_loggedBoot){
-      console.info('Render loop starting. party.size=', party.size, 'leader=', party.leader && {x:Math.round(party.leader.x), y:Math.round(party.leader.y)} );
-      _loggedBoot = true;
-    }
-  party.draw(ctx, view);
-  }catch(err){
-    console.error('party.draw failed', err && err.stack ? err.stack : err);
-  }
-  // Hero marker must be drawn after party so it sits on top
-  try{ drawHeroMarker(ctx, view, party.leader); } catch(e){ console.warn('Hero marker draw failed', e); }
-  combat.draw(ctx, fx, view);
-
-  // no debug overlay in production
-
-  combat.drawLighting(fx, view, party.leader);
-  if(document.getElementById('bloom') && document.getElementById('bloom').checked) combat.compositeBloom(gameC, fxC, innerWidth, innerHeight);
-
-  requestAnimationFrame(loop);
 }
-requestAnimationFrame(loop);
 
-// Update debug panel regularly (in case user opens outside devtools)
-setInterval(()=>{
-  if(typeof _debugPanel === 'undefined' || !_debugPanel) return;
-  const leader = party && party.leader ? `${Math.round(party.leader.x)},${Math.round(party.leader.y)}` : 'none';
-  _debugPanel.innerHTML = `cam: ${Math.round(camX)},${Math.round(camY)}<br>leader: ${leader}<br>canvas: ${innerWidth}×${innerHeight}`;
-}, 250);
+window.addEventListener('resize', () => {
+  ensureCanvasSize();
+  resize();
+});
+ensureCanvasSize();
+resize();
+
+let lastStatus = '';
+let lastTerrain = '';
+
+function updateStatus(text) {
+  if (text !== lastStatus) {
+    ui.setStatus(text);
+    lastStatus = text;
+  }
+}
+
+function updateTerrain(name) {
+  if (name !== lastTerrain) {
+    ui.setTerrain(name);
+    lastTerrain = name;
+  }
+}
+
+function updateCamera() {
+  const leader = party.leader;
+  if (!leader) return;
+  camera.x = leader.x - camera.width / 2;
+  camera.y = leader.y - camera.height / 2;
+  const { width, height } = world.getPixelSize();
+  camera.x = clamp(camera.x, 0, Math.max(0, width - camera.width));
+  camera.y = clamp(camera.y, 0, Math.max(0, height - camera.height));
+}
+
+function update(dt) {
+  const direction = input.getDirection();
+  party.update(dt, world, direction);
+  combat.update(dt);
+  updateCamera();
+
+  const leader = party.leader;
+  if (leader) {
+    const terrain = world.terrainAtWorld(leader.x, leader.y);
+    updateTerrain(terrain?.name ?? '-');
+    if (leader.isOverweight()) {
+      updateStatus(`${leader.name} is slowed by the weight of their gear.`);
+    } else if (direction.x !== 0 || direction.y !== 0) {
+      updateStatus('Exploring the outskirts of Britain...');
+    } else {
+      updateStatus('Use WASD or the arrow keys to explore.');
+    }
+  }
+}
+
+function drawParty(ctx, party, cam) {
+  const radius = 14;
+  party.members.forEach((member, index) => {
+    const sx = member.x - cam.x;
+    const sy = member.y - cam.y;
+    ctx.save();
+    ctx.fillStyle = 'rgba(5, 12, 22, 0.35)';
+    ctx.beginPath();
+    ctx.ellipse(sx, sy + radius * 0.65, radius * 0.9, radius * 0.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.fillStyle = index === party.leaderIndex ? '#ffd35f' : '#9ecfff';
+    ctx.strokeStyle = 'rgba(12, 24, 36, 0.85)';
+    ctx.lineWidth = 2;
+    ctx.arc(sx, sy, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#0b1728';
+    ctx.font = '12px "Inter", system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText(member.name, sx, sy - radius - 6);
+    ctx.restore();
+  });
+}
+
+function render() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawWorld(ctx, world, camera);
+  drawParty(ctx, party, camera);
+}
+
+let lastTime = performance.now();
+
+function frame(now) {
+  const dt = Math.min((now - lastTime) / 1000, 0.25);
+  lastTime = now;
+  update(dt);
+  render();
+  requestAnimationFrame(frame);
+}
+
+requestAnimationFrame(frame);
+
+window.addEventListener('beforeunload', () => input.destroy());

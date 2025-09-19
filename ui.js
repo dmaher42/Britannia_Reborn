@@ -1,75 +1,157 @@
-// Overlay helpers
-export function showOverlay(id, text) {
-  let el = document.getElementById(id);
-  if (!el) {
-    el = document.createElement('div');
-    el.id = id;
-    el.style.position = 'fixed';
-    el.style.left = '0';
-    el.style.top = '0';
-    el.style.width = '100vw';
-    el.style.height = '100vh';
-    el.style.zIndex = '1000';
-    el.style.pointerEvents = 'none';
-    el.style.textAlign = 'center';
-    el.style.font = '16px sans-serif';
-    el.style.color = '#fff';
-    el.style.background = 'rgba(0,0,0,0.25)';
-    document.body.appendChild(el);
-  }
-  el.textContent = text;
-  el.style.display = 'block';
-}
-export function hideOverlay(id) {
-  const el = document.getElementById(id);
-  if (el) el.style.display = 'none';
-}
-export const dialogueEl = document.getElementById('dialogue');
-export const toast = document.getElementById('toast');
-export const gridLayer = document.getElementById('gridOverlay');
+const formatWeight = (weight) => `${weight.toFixed(1)} st`;
 
-export function showToast(msg, ms=1400){ toast.textContent=msg; toast.style.display='inline-block'; clearTimeout(showToast._t); showToast._t=setTimeout(()=>toast.style.display='none', ms); }
-export function pushBubble(who, text){
-  const el = document.createElement('div');
-  el.className='bubble'; el.innerHTML = `<div class="who">${who}</div><div class="text"></div>`;
-  dialogueEl.appendChild(el); dialogueEl.scrollTop = dialogueEl.scrollHeight;
-  const textEl = el.querySelector('.text');
-  let i=0; const id=setInterval(()=>{ textEl.textContent=text.slice(0,++i); dialogueEl.scrollTop = dialogueEl.scrollHeight; if(i>=text.length) clearInterval(id); },10);
-  return el;
-}
-export function pushActions(actions){
-  const a = document.createElement('div'); a.className='actions';
-  actions.forEach(({label,fn})=>{ const b=document.createElement('button'); b.className='btn'; b.textContent=label; b.onclick=fn; a.appendChild(b); });
-  const last = dialogueEl.lastElementChild; (last? last: dialogueEl).appendChild(a);
-  dialogueEl.scrollTop = dialogueEl.scrollHeight;
-}
+export function setupUI({
+  party,
+  inventory,
+  spellbook,
+  combat,
+  onTalk,
+  onCast,
+  onStartCombat,
+  onAddLoot
+}) {
+  const partyList = document.getElementById('partyList');
+  const inventoryList = document.getElementById('inventoryList');
+  const inventoryWeight = document.getElementById('inventoryWeight');
+  const inventoryGold = document.getElementById('inventoryGold');
+  const terrainLabel = document.getElementById('terrainLabel');
+  const statusText = document.getElementById('statusText');
+  const logContainer = document.getElementById('log');
+  const toast = document.getElementById('toast');
+  const buttonTalk = document.getElementById('btnTalk');
+  const buttonCast = document.getElementById('btnCast');
+  const buttonCombat = document.getElementById('btnCombat');
+  const buttonLoot = document.getElementById('btnAddLoot');
 
-export function updatePartyUI(party){
-  const node = document.getElementById('partyList'); node.innerHTML='';
-  party.members.forEach(m=>{
-    const hpPct = Math.max(0, Math.min(1, m.hp/m.hpMax))*100;
-    const mpPct = m.mpMax? Math.max(0, Math.min(1, m.mp/m.mpMax))*100 : 0;
-    const overweight = m.isOverweight && m.isOverweight();
-    const row = document.createElement('div'); row.className='row';
-    row.innerHTML = `<div>${m.name} (Class: ${m.cls}, STR:${m.STR} DEX:${m.DEX} INT:${m.INT})${overweight ? ' <span style="color:#ff6b6b;font-weight:bold">[Overweight]</span>' : ''}</div>
-      <div style="display:flex;gap:10px;min-width:180px">
-        <div class="meter" style="width:100px"><span class="hp" style="display:block;height:10px;background:linear-gradient(90deg,#ff6b6b,#ff3b57);width:${hpPct}%"></span></div>
-        <div class="meter" style="width:100px"><span class="mp" style="display:block;height:10px;background:linear-gradient(90deg,#6bc7ff,#39c2ff);width:${mpPct}%"></span></div>
-      </div>`;
-    node.appendChild(row);
-  });
-}
+  let toastTimeout = null;
 
-export function updateInventoryUI(inv, party){
-  document.getElementById('reagents').textContent = `Sulfur Ash: ${inv.count('sulfur_ash')} · Black Pearl: ${inv.count('black_pearl')}`;
-  document.getElementById('totalWeight').textContent = inv.totalWeight().toFixed(1) + ' wt';
-    // Show per-character equip/pack weights and overweight status
-    let equipStatus = '';
-    let packStatus = '';
-    if (party && party.members) {
-      equipStatus = party.members.map(m => `${m.name}: ${m.equippedWeight ? m.equippedWeight() : 0}/${m.STR}${m.isOverweight && m.isOverweight() && m.equippedWeight && m.equippedWeight() > m.STR ? ' <span style="color:#ff6b6b">[Over]</span>' : ''}`).join(', ');
-      packStatus = party.members.map(m => `${m.name}: ${m.backpackWeight ? m.backpackWeight() : 0}/${m.packLimit ? m.packLimit() : 0}${m.isOverweight && m.isOverweight() && m.backpackWeight && m.backpackWeight() > m.packLimit() ? ' <span style="color:#ff6b6b">[Over]</span>' : ''}`).join(', ');
+  const addButtonHandler = (button, handler) => {
+    if (button && typeof handler === 'function') {
+      button.addEventListener('click', handler);
     }
-    document.getElementById('equipRule').innerHTML = equipStatus || 'equip ≤ STR';
-    document.getElementById('packRule').innerHTML = packStatus || 'pack ≤ STR×2';
+  };
+
+  addButtonHandler(buttonTalk, onTalk);
+  addButtonHandler(buttonCast, onCast);
+  addButtonHandler(buttonCombat, onStartCombat);
+  addButtonHandler(buttonLoot, onAddLoot);
+
+  if (buttonCast && spellbook && party) {
+    buttonCast.disabled = false;
+  }
+
+  if (combat) {
+    combat.onEvent((event, payload) => {
+      if (event === 'log' && typeof payload === 'string') {
+        log(payload);
+      }
+      if (event === 'complete' && payload?.victory) {
+        showToast('Victory!');
+      }
+    });
+  }
+
+  function refreshParty() {
+    if (!partyList) return;
+    partyList.replaceChildren();
+    const fragment = document.createDocumentFragment();
+    party.members.forEach((member, index) => {
+      const li = document.createElement('li');
+      li.className = 'party-entry' + (index === party.leaderIndex ? ' leader' : '');
+
+      const header = document.createElement('div');
+      header.className = 'header';
+      header.innerHTML = `<span>${member.name}</span><span class="class">${member.cls}</span>`;
+
+      const stats = document.createElement('div');
+      stats.className = 'stats';
+      stats.innerHTML = `<span>HP ${Math.round(member.hp)}/${Math.round(member.hpMax)}</span><span>MP ${Math.round(member.mp)}/${Math.round(member.mpMax)}</span>`;
+
+      const carry = document.createElement('div');
+      carry.className = 'carry';
+      carry.innerHTML = `<span>Equipped</span><span>${formatWeight(member.equippedWeight())} / ${member.STR}</span>`;
+
+      const pack = document.createElement('div');
+      pack.className = 'carry';
+      pack.innerHTML = `<span>Backpack</span><span>${formatWeight(member.backpackWeight())} / ${(member.STR * 2).toFixed(1)}</span>`;
+
+      const speed = document.createElement('div');
+      speed.className = 'speed' + (member.isOverweight() ? ' overweight' : '');
+      speed.innerHTML = `<span>Speed</span><span>${Math.round(member.speed())} u/s</span>`;
+
+      li.append(header, stats, carry, pack, speed);
+      fragment.appendChild(li);
+    });
+    partyList.appendChild(fragment);
+  }
+
+  function refreshInventory() {
+    if (!inventoryList) return;
+    inventoryList.replaceChildren();
+    const fragment = document.createDocumentFragment();
+    inventory.items.forEach((item) => {
+      const row = document.createElement('div');
+      row.className = 'inventory-item';
+      const weight = item.weight * item.qty;
+      row.innerHTML = `<span>${item.name}</span><span>x${item.qty}</span><span>${formatWeight(weight)}</span>`;
+      fragment.appendChild(row);
+    });
+    inventoryList.appendChild(fragment);
+    if (inventoryWeight) {
+      inventoryWeight.textContent = formatWeight(inventory.totalWeight());
+    }
+    if (inventoryGold) {
+      inventoryGold.textContent = `${inventory.gold ?? 0}`;
+    }
+  }
+
+  function setTerrain(name) {
+    if (terrainLabel) {
+      terrainLabel.textContent = `Terrain: ${name ?? '-'}`;
+    }
+  }
+
+  function setStatus(message) {
+    if (statusText) {
+      statusText.textContent = message;
+    }
+  }
+
+  function log(message) {
+    if (!logContainer) return;
+    const entry = document.createElement('div');
+    entry.className = 'log-entry';
+    entry.textContent = message;
+    logContainer.appendChild(entry);
+    while (logContainer.children.length > 40) {
+      logContainer.removeChild(logContainer.firstChild);
+    }
+    logContainer.scrollTop = logContainer.scrollHeight;
+  }
+
+  function showToast(message) {
+    if (!toast) return;
+    toast.textContent = message;
+    toast.hidden = false;
+    toast.classList.add('visible');
+    clearTimeout(toastTimeout);
+    toastTimeout = setTimeout(() => {
+      toast.classList.remove('visible');
+      toastTimeout = setTimeout(() => {
+        toast.hidden = true;
+      }, 250);
+    }, 2200);
+  }
+
+  refreshParty();
+  refreshInventory();
+
+  return {
+    refreshParty,
+    refreshInventory,
+    setTerrain,
+    setStatus,
+    log,
+    showToast
+  };
 }
