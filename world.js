@@ -55,6 +55,332 @@ export const propFallbackColors = {
   brazier: '#8c6f4a'
 };
 
+const baseTerrainSky = {
+  top: '#2f4868',
+  mid: '#3d6c88',
+  bottom: '#a3c6c0',
+  sun: '#f8e6b5',
+  glow: 'rgba(255, 216, 164, 0.6)'
+};
+
+const baseTerrainGround = {
+  base: '#213029',
+  highlight: '#385245',
+  shadow: '#111c16',
+  detail: '#415a46',
+  secondaryDetail: '#24392c',
+  tileSize: 140,
+  noiseStrength: 0.32,
+  streakIntensity: 0.18
+};
+
+const baseAmbientSettings = {
+  tint: 'rgba(34, 54, 46, 0.32)',
+  light: 'rgba(245, 225, 186, 0.24)',
+  highlight: 'rgba(255, 237, 184, 0.16)',
+  origin: { x: 0.62, y: 0.28 },
+  radius: 1.18
+};
+
+const baseFogSettings = {
+  color: 'rgba(116, 164, 150, 0.18)',
+  horizon: 'rgba(175, 210, 220, 0.18)'
+};
+
+const baseVignette = {
+  strength: 0.38,
+  color: 'rgba(12, 20, 18, 0.85)'
+};
+
+const baseBloom = {
+  color: 'rgba(255, 220, 160, 0.18)',
+  radius: 0.75
+};
+
+const createTerrainTheme = (overrides = {}) => ({
+  sky: { ...baseTerrainSky, ...(overrides.sky ?? {}) },
+  ground: { ...baseTerrainGround, ...(overrides.ground ?? {}) },
+  ambient: { ...baseAmbientSettings, ...(overrides.ambient ?? {}) },
+  fog: { ...baseFogSettings, ...(overrides.fog ?? {}) },
+  vignette: { ...baseVignette, ...(overrides.vignette ?? {}) },
+  bloom: { ...baseBloom, ...(overrides.bloom ?? {}) }
+});
+
+const terrainThemes = {
+  default: createTerrainTheme(),
+  'castle keep': createTerrainTheme({
+    sky: {
+      top: '#1e2741',
+      mid: '#2d4f7a',
+      bottom: '#8bb2da'
+    },
+    ground: {
+      base: '#222e29',
+      highlight: '#3f5446',
+      shadow: '#101a15',
+      detail: '#425d4c',
+      secondaryDetail: '#24352b',
+      tileSize: 150,
+      noiseStrength: 0.28,
+      streakIntensity: 0.22
+    },
+    ambient: {
+      tint: 'rgba(28, 48, 42, 0.36)',
+      light: 'rgba(255, 231, 189, 0.26)',
+      origin: { x: 0.52, y: 0.32 },
+      radius: 1.26
+    },
+    fog: {
+      color: 'rgba(90, 124, 144, 0.22)',
+      horizon: 'rgba(172, 204, 224, 0.22)'
+    },
+    bloom: {
+      color: 'rgba(255, 224, 170, 0.22)',
+      radius: 0.82
+    }
+  }),
+  meadow: createTerrainTheme({
+    sky: {
+      top: '#284a5c',
+      mid: '#3c7a8f',
+      bottom: '#b7e0c6'
+    },
+    ground: {
+      base: '#1f3325',
+      highlight: '#3f6b3f',
+      shadow: '#112017',
+      detail: '#4a7b45',
+      secondaryDetail: '#284f32',
+      tileSize: 130,
+      noiseStrength: 0.36,
+      streakIntensity: 0.16
+    },
+    ambient: {
+      tint: 'rgba(34, 60, 44, 0.32)',
+      light: 'rgba(234, 246, 198, 0.2)',
+      highlight: 'rgba(255, 255, 210, 0.2)',
+      origin: { x: 0.58, y: 0.26 }
+    },
+    fog: {
+      color: 'rgba(132, 200, 158, 0.18)',
+      horizon: 'rgba(188, 232, 207, 0.2)'
+    },
+    vignette: {
+      strength: 0.32,
+      color: 'rgba(14, 24, 18, 0.75)'
+    }
+  }),
+  'whispering forest': createTerrainTheme({
+    sky: {
+      top: '#121c2d',
+      mid: '#223a4a',
+      bottom: '#7da0b2',
+      glow: 'rgba(136, 186, 222, 0.4)'
+    },
+    ground: {
+      base: '#101b17',
+      highlight: '#2f463a',
+      shadow: '#080f0c',
+      detail: '#375043',
+      secondaryDetail: '#182824',
+      tileSize: 140,
+      noiseStrength: 0.42,
+      streakIntensity: 0.12
+    },
+    ambient: {
+      tint: 'rgba(20, 38, 34, 0.46)',
+      light: 'rgba(152, 196, 184, 0.2)',
+      highlight: 'rgba(196, 240, 220, 0.12)',
+      origin: { x: 0.72, y: 0.22 },
+      radius: 1.32
+    },
+    fog: {
+      color: 'rgba(74, 112, 108, 0.25)',
+      horizon: 'rgba(160, 200, 210, 0.18)'
+    },
+    vignette: {
+      strength: 0.44,
+      color: 'rgba(6, 10, 12, 0.9)'
+    }
+  }),
+  'drowned coast': createTerrainTheme({
+    sky: {
+      top: '#0e1a2a',
+      mid: '#183a53',
+      bottom: '#5c8aa8',
+      sun: '#f5f0d0'
+    },
+    ground: {
+      base: '#142227',
+      highlight: '#2b4b54',
+      shadow: '#09131a',
+      detail: '#2f5c5f',
+      secondaryDetail: '#12272c',
+      tileSize: 150,
+      noiseStrength: 0.34,
+      streakIntensity: 0.24
+    },
+    ambient: {
+      tint: 'rgba(20, 40, 48, 0.42)',
+      light: 'rgba(180, 224, 240, 0.22)',
+      highlight: 'rgba(166, 206, 240, 0.16)',
+      origin: { x: 0.54, y: 0.24 }
+    },
+    fog: {
+      color: 'rgba(62, 116, 140, 0.28)',
+      horizon: 'rgba(132, 188, 214, 0.28)'
+    },
+    bloom: {
+      color: 'rgba(180, 220, 255, 0.22)',
+      radius: 0.9
+    }
+  })
+};
+
+const normalizeTerrainName = (name) => {
+  if (!name || typeof name !== 'string') return 'default';
+  return name.trim().toLowerCase();
+};
+
+const getTerrainTheme = (terrainName) => {
+  const normalized = normalizeTerrainName(terrainName);
+  return terrainThemes[normalized] || terrainThemes.default;
+};
+
+const pseudoRandom = (x, y) => {
+  const value = Math.sin((x * 127.1 + y * 311.7) * 43758.5453);
+  return value - Math.floor(value);
+};
+
+const drawTerrainBase = (ctx, cam, theme) => {
+  const { ground } = theme;
+  const gradient = ctx.createLinearGradient(0, 0, 0, cam.height);
+  gradient.addColorStop(0, ground.highlight);
+  gradient.addColorStop(1, ground.shadow);
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, cam.width, cam.height);
+
+  const tileSize = Math.max(32, ground.tileSize || 120);
+  const noiseStrength = ground.noiseStrength ?? 0.3;
+  const startX = Math.floor((cam.x - cam.width) / tileSize) * tileSize;
+  const startY = Math.floor((cam.y - cam.height) / tileSize) * tileSize;
+  const endX = cam.x + cam.width * 2;
+  const endY = cam.y + cam.height * 2;
+
+  ctx.save();
+  ctx.globalAlpha = 0.55;
+  for (let worldY = startY; worldY < endY; worldY += tileSize) {
+    for (let worldX = startX; worldX < endX; worldX += tileSize) {
+      const tileX = Math.floor(worldX / tileSize);
+      const tileY = Math.floor(worldY / tileSize);
+      const noise = pseudoRandom(tileX, tileY);
+      const screenX = worldX - cam.x;
+      const screenY = worldY - cam.y;
+      const baseColor = noise > 0.55
+        ? lightenColor(ground.detail, (noise - 0.55) * noiseStrength)
+        : darkenColor(ground.secondaryDetail, (0.55 - noise) * noiseStrength);
+      const patchSize = tileSize * 0.92;
+      const inset = tileSize * 0.08;
+      ctx.fillStyle = baseColor;
+      ctx.fillRect(screenX + inset * 0.5, screenY + inset * 0.5, patchSize, patchSize);
+    }
+  }
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalAlpha = ground.streakIntensity ?? 0.15;
+  ctx.strokeStyle = lightenColor(ground.detail, 0.18);
+  ctx.lineWidth = Math.max(1, tileSize * 0.06);
+  const stripeSpacing = tileSize * 0.75;
+  for (let offset = -cam.height; offset < cam.width + cam.height; offset += stripeSpacing) {
+    ctx.beginPath();
+    ctx.moveTo(offset - cam.height * 0.5, cam.height);
+    ctx.lineTo(offset + cam.height * 0.3, 0);
+    ctx.stroke();
+  }
+  ctx.restore();
+};
+
+const applyAmbientLight = (ctx, cam, theme) => {
+  const { ambient } = theme;
+  if (!ambient) return;
+  ctx.save();
+  if (ambient.tint) {
+    ctx.fillStyle = ambient.tint;
+    ctx.fillRect(0, 0, cam.width, cam.height);
+  }
+  const originX = cam.width * (ambient.origin?.x ?? 0.5);
+  const originY = cam.height * (ambient.origin?.y ?? 0.3);
+  const radius = Math.max(cam.width, cam.height) * (ambient.radius ?? 1);
+  const gradient = ctx.createRadialGradient(originX, originY, radius * 0.15, originX, originY, radius);
+  gradient.addColorStop(0, ambient.highlight ?? 'rgba(255, 255, 255, 0.18)');
+  gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, cam.width, cam.height);
+  if (ambient.light) {
+    ctx.globalCompositeOperation = 'soft-light';
+    ctx.fillStyle = ambient.light;
+    ctx.fillRect(0, 0, cam.width, cam.height);
+  }
+  ctx.restore();
+};
+
+const applyFog = (ctx, cam, theme) => {
+  const { fog } = theme;
+  if (!fog) return;
+  ctx.save();
+  const gradient = ctx.createLinearGradient(0, 0, 0, cam.height);
+  gradient.addColorStop(0, fog.horizon ?? 'rgba(255, 255, 255, 0)');
+  gradient.addColorStop(1, fog.color ?? 'rgba(0, 0, 0, 0)');
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, cam.width, cam.height);
+  ctx.restore();
+};
+
+const applyBloom = (ctx, cam, theme) => {
+  const { bloom } = theme;
+  if (!bloom) return;
+  ctx.save();
+  const radius = Math.max(cam.width, cam.height) * (bloom.radius ?? 0.75);
+  const gradient = ctx.createRadialGradient(
+    cam.width * 0.6,
+    cam.height * 0.35,
+    radius * 0.1,
+    cam.width * 0.6,
+    cam.height * 0.35,
+    radius
+  );
+  gradient.addColorStop(0, bloom.color ?? 'rgba(255, 220, 170, 0.16)');
+  gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.globalCompositeOperation = 'screen';
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, cam.width, cam.height);
+  ctx.restore();
+};
+
+const applyVignette = (ctx, cam, theme) => {
+  const { vignette } = theme;
+  if (!vignette || vignette.strength <= 0) return;
+  ctx.save();
+  const gradient = ctx.createRadialGradient(
+    cam.width / 2,
+    cam.height * 0.58,
+    Math.min(cam.width, cam.height) * 0.3,
+    cam.width / 2,
+    cam.height * 0.6,
+    Math.max(cam.width, cam.height) * 0.9
+  );
+  gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+  gradient.addColorStop(1, vignette.color ?? 'rgba(12, 20, 18, 0.85)');
+  ctx.globalAlpha = vignette.strength;
+  ctx.globalCompositeOperation = 'multiply';
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, cam.width, cam.height);
+  ctx.restore();
+};
+
 const drawRoundedRectPath = (ctx, x, y, width, height, radius) => {
   const r = Math.min(radius, width / 2, height / 2);
   ctx.beginPath();
@@ -878,64 +1204,212 @@ const customPropRenderers = {
   brazier: drawBrazierProp
 };
 
+const drawGenericProp = (ctx, prop, cam) => {
+  const screenX = prop.x - cam.x;
+  const screenY = prop.y - cam.y;
+  const { width, height } = prop;
+  ctx.save();
+  ctx.translate(screenX, screenY);
+
+  ctx.save();
+  ctx.globalAlpha = 0.3;
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+  ctx.beginPath();
+  ctx.ellipse(width / 2, height + height * 0.12, width * 0.45, height * 0.22, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  const baseColor = prop.color || 'rgba(200, 210, 220, 0.85)';
+  const radius = Math.min(width, height) * 0.14;
+  const gradient = ctx.createLinearGradient(0, 0, 0, height);
+  gradient.addColorStop(0, lightenColor(baseColor, 0.22));
+  gradient.addColorStop(0.5, baseColor);
+  gradient.addColorStop(1, darkenColor(baseColor, 0.28));
+  ctx.fillStyle = gradient;
+  drawRoundedRectPath(ctx, 0, 0, width, height, radius);
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(8, 12, 16, 0.4)';
+  ctx.lineWidth = Math.max(1, radius * 0.4);
+  drawRoundedRectPath(ctx, 0, 0, width, height, radius);
+  ctx.stroke();
+
+  ctx.save();
+  ctx.globalAlpha = 0.35;
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+  drawRoundedRectPath(ctx, width * 0.08, height * 0.1, width * 0.5, height * 0.22, radius * 0.6);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalAlpha = 0.25;
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+  drawRoundedRectPath(ctx, width * 0.08, height * 0.65, width * 0.84, height * 0.28, radius * 0.5);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.strokeStyle = lightenColor(baseColor, 0.3);
+  ctx.lineWidth = Math.max(1, height * 0.04);
+  ctx.beginPath();
+  ctx.moveTo(width * 0.12, height * 0.32);
+  ctx.lineTo(width * 0.88, height * 0.24);
+  ctx.stroke();
+
+  ctx.restore();
+};
+
 const parallaxLayers = [
   {
     name: 'sky',
-    factor: 0.15,
-    draw(ctx, scrollX, scrollY, cam) {
+    factor: 0.08,
+    draw(ctx, scrollX, scrollY, cam, theme) {
+      const { sky } = theme;
+      ctx.save();
+      ctx.globalCompositeOperation = 'screen';
+      ctx.globalAlpha = 0.85;
       const gradient = ctx.createLinearGradient(0, 0, 0, cam.height);
-      gradient.addColorStop(0, '#7fb1ff');
-      gradient.addColorStop(1, '#e6f0ff');
+      gradient.addColorStop(0, sky.top);
+      gradient.addColorStop(0.45, sky.mid);
+      gradient.addColorStop(1, sky.bottom);
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, cam.width, cam.height);
+      ctx.restore();
+    }
+  },
+  {
+    name: 'sun',
+    factor: 0.12,
+    draw(ctx, scrollX, scrollY, cam, theme) {
+      const { sky } = theme;
+      const cycle = ((scrollX / (cam.width * 4)) % 1 + 1) % 1;
+      const sunX = cam.width * (0.82 - cycle * 0.64);
+      const sunY = cam.height * (0.22 + Math.sin(cycle * Math.PI * 2) * 0.06) + scrollY * 0.04;
+      ctx.save();
+      const glowRadius = Math.max(cam.width, cam.height) * 0.55;
+      const radial = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, glowRadius);
+      radial.addColorStop(0, sky.sun || '#f8e6b5');
+      radial.addColorStop(0.28, sky.glow || 'rgba(255, 216, 164, 0.55)');
+      radial.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.globalCompositeOperation = 'screen';
+      ctx.globalAlpha = 0.65;
+      ctx.fillStyle = radial;
+      ctx.fillRect(0, 0, cam.width, cam.height);
+      ctx.restore();
+    }
+  },
+  {
+    name: 'clouds',
+    factor: 0.18,
+    draw(ctx, scrollX, scrollY, cam, theme) {
+      const { sky } = theme;
+      const cloudColor = lightenColor(sky.bottom, 0.18);
+      const shadowColor = darkenColor(sky.mid, 0.12);
+      ctx.save();
+      ctx.globalAlpha = 0.65;
+      const baseY = cam.height * (0.18 + Math.sin(scrollY * 0.0004) * 0.04);
+      const width = 220;
+      const offset = -((scrollX * 0.4) % (width * 2)) - width * 2;
+      for (let x = offset; x < cam.width + width * 2; x += width) {
+        const cloudHeight = 50 + ((x / width) % 3) * 12;
+        ctx.beginPath();
+        ctx.moveTo(x, baseY);
+        ctx.bezierCurveTo(x + width * 0.2, baseY - cloudHeight, x + width * 0.6, baseY - cloudHeight * 0.6, x + width, baseY);
+        ctx.bezierCurveTo(x + width * 0.6, baseY + cloudHeight * 0.6, x + width * 0.2, baseY + cloudHeight * 0.25, x, baseY);
+        ctx.closePath();
+        const gradient = ctx.createLinearGradient(x, baseY - cloudHeight, x, baseY + cloudHeight);
+        gradient.addColorStop(0, lightenColor(cloudColor, 0.1));
+        gradient.addColorStop(1, shadowColor);
+        ctx.fillStyle = gradient;
+        ctx.fill();
+      }
+      ctx.restore();
     }
   },
   {
     name: 'mountains',
-    factor: 0.35,
-    draw(ctx, scrollX, scrollY, cam) {
-      const baseY = cam.height * 0.65 + scrollY * 0.05;
-      const peakHeight = 140;
-      const width = 240;
+    factor: 0.32,
+    draw(ctx, scrollX, scrollY, cam, theme) {
+      const { sky } = theme;
+      const baseY = cam.height * 0.7 + scrollY * 0.08;
+      const peakHeight = 160;
+      const width = 300;
       const startX = -((scrollX) % width) - width;
+      ctx.save();
+      ctx.globalAlpha = 0.7;
       for (let x = startX; x < cam.width + width; x += width) {
-        ctx.fillStyle = '#5a769a';
+        const gradient = ctx.createLinearGradient(0, baseY - peakHeight, 0, baseY + peakHeight * 0.2);
+        gradient.addColorStop(0, lightenColor(sky.mid, 0.05));
+        gradient.addColorStop(1, darkenColor(sky.mid, 0.25));
+        ctx.fillStyle = gradient;
         ctx.beginPath();
         ctx.moveTo(x, baseY);
         ctx.lineTo(x + width * 0.5, baseY - peakHeight);
         ctx.lineTo(x + width, baseY);
+        ctx.lineTo(x + width * 0.82, baseY + peakHeight * 0.2);
+        ctx.lineTo(x + width * 0.18, baseY + peakHeight * 0.2);
         ctx.closePath();
         ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x + width * 0.5, baseY - peakHeight);
+        ctx.lineTo(x + width * 0.6, baseY - peakHeight * 0.45);
+        ctx.stroke();
       }
+      ctx.restore();
     }
   },
   {
-    name: 'near-forest',
-    factor: 0.55,
-    draw(ctx, scrollX, scrollY, cam) {
-      const baseY = cam.height * 0.85 + scrollY * 0.08;
-      const width = 80;
+    name: 'distant-forest',
+    factor: 0.48,
+    draw(ctx, scrollX, scrollY, cam, theme) {
+      const { ground } = theme;
+      const baseY = cam.height * 0.88 + scrollY * 0.06;
+      const width = 120;
       const startX = -((scrollX) % width) - width;
+      ctx.save();
+      ctx.globalAlpha = 0.75;
       for (let x = startX; x < cam.width + width; x += width) {
-        ctx.fillStyle = '#284b32';
-        ctx.fillRect(x, baseY - 120, width * 0.6, 120);
-        ctx.fillStyle = '#1d3a25';
+        const treeHeight = 120 + (x % 3) * 18;
+        const trunkGradient = ctx.createLinearGradient(0, baseY - treeHeight, 0, baseY);
+        trunkGradient.addColorStop(0, lightenColor(ground.detail, 0.3));
+        trunkGradient.addColorStop(1, darkenColor(ground.detail, 0.2));
+        ctx.fillStyle = trunkGradient;
         ctx.beginPath();
-        ctx.moveTo(x + width * 0.3, baseY - 120);
-        ctx.lineTo(x + width * 0.5, baseY - 160);
-        ctx.lineTo(x + width * 0.7, baseY - 120);
+        ctx.moveTo(x, baseY);
+        ctx.lineTo(x + width * 0.5, baseY - treeHeight);
+        ctx.lineTo(x + width, baseY);
         ctx.closePath();
         ctx.fill();
+        ctx.fillStyle = darkenColor(ground.secondaryDetail, 0.2);
+        ctx.fillRect(x + width * 0.45, baseY - treeHeight * 0.25, width * 0.1, treeHeight * 0.25);
       }
+      ctx.restore();
+    }
+  },
+  {
+    name: 'ground-mist',
+    factor: 0.52,
+    draw(ctx, scrollX, scrollY, cam, theme) {
+      const { fog } = theme;
+      ctx.save();
+      const mist = ctx.createLinearGradient(0, cam.height * 0.4, 0, cam.height);
+      mist.addColorStop(0, 'rgba(0, 0, 0, 0)');
+      mist.addColorStop(1, fog?.color ?? 'rgba(160, 190, 190, 0.28)');
+      ctx.globalAlpha = 0.6;
+      ctx.globalCompositeOperation = 'screen';
+      ctx.fillStyle = mist;
+      ctx.fillRect(0, 0, cam.width, cam.height);
+      ctx.restore();
     }
   }
 ];
 
-const drawParallax = (ctx, cam) => {
+const drawParallax = (ctx, cam, theme) => {
   parallaxLayers.forEach((layer) => {
     const scrollX = cam.x * layer.factor;
     const scrollY = cam.y * layer.factor;
-    layer.draw(ctx, scrollX, scrollY, cam);
+    layer.draw(ctx, scrollX, scrollY, cam, theme);
   });
 };
 
@@ -1003,16 +1477,279 @@ const isVisible = (rect, cam) => {
   );
 };
 
-const drawObstacle = (ctx, obstacle, cam) => {
+const drawWallObstacle = (ctx, obstacle, cam) => {
+  const x = obstacle.x - cam.x;
+  const y = obstacle.y - cam.y;
+  const { width, height } = obstacle;
+  const baseColor = obstacleStyles.wall || '#8d7a5b';
+  ctx.save();
+  ctx.translate(x, y);
+
+  const radius = Math.min(width, height) * 0.08;
+  const gradient = ctx.createLinearGradient(0, 0, 0, height);
+  gradient.addColorStop(0, lightenColor(baseColor, 0.32));
+  gradient.addColorStop(0.5, baseColor);
+  gradient.addColorStop(1, darkenColor(baseColor, 0.3));
+  ctx.fillStyle = gradient;
+  drawRoundedRectPath(ctx, 0, 0, width, height, radius);
+  ctx.fill();
+
+  ctx.fillStyle = lightenColor(baseColor, 0.45);
+  ctx.fillRect(0, 0, width, Math.max(3, height * 0.12));
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+  ctx.fillRect(0, height - Math.max(4, height * 0.15), width, Math.max(4, height * 0.15));
+
+  const brickHeight = Math.max(12, height / 6);
+  const brickWidth = Math.max(30, width / 5);
+  ctx.strokeStyle = 'rgba(30, 22, 16, 0.25)';
+  ctx.lineWidth = 1.2;
+  for (let by = brickHeight; by < height; by += brickHeight) {
+    ctx.beginPath();
+    ctx.moveTo(radius, by);
+    ctx.lineTo(width - radius, by);
+    ctx.stroke();
+  }
+  for (let row = 0; row < height; row += brickHeight) {
+    const offset = (row / brickHeight) % 2 === 0 ? 0 : brickWidth / 2;
+    for (let bx = offset; bx < width; bx += brickWidth) {
+      ctx.beginPath();
+      ctx.moveTo(bx, row);
+      ctx.lineTo(bx, Math.min(height, row + brickHeight));
+      ctx.stroke();
+    }
+  }
+
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(radius * 0.5, height * 0.35);
+  ctx.lineTo(width * 0.25, height * 0.18);
+  ctx.moveTo(width * 0.65, height * 0.22);
+  ctx.lineTo(width - radius * 0.5, height * 0.4);
+  ctx.stroke();
+
+  ctx.restore();
+};
+
+const drawRockObstacle = (ctx, obstacle, cam) => {
+  const x = obstacle.x - cam.x;
+  const y = obstacle.y - cam.y;
+  const { width, height } = obstacle;
+  const baseColor = obstacleStyles.rock || '#4f535d';
+  ctx.save();
+  ctx.translate(x, y);
+
+  ctx.save();
+  ctx.globalAlpha = 0.35;
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+  ctx.beginPath();
+  ctx.ellipse(width * 0.5, height, width * 0.55, height * 0.28, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  const gradient = ctx.createLinearGradient(0, 0, width, height);
+  gradient.addColorStop(0, lightenColor(baseColor, 0.35));
+  gradient.addColorStop(0.5, baseColor);
+  gradient.addColorStop(1, darkenColor(baseColor, 0.35));
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.moveTo(width * 0.1, height * 0.85);
+  ctx.lineTo(width * 0.22, height * 0.25);
+  ctx.lineTo(width * 0.52, height * 0.05);
+  ctx.lineTo(width * 0.9, height * 0.3);
+  ctx.lineTo(width * 0.78, height * 0.88);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.28)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < 3; i += 1) {
+    const t = (i + 1) / 4;
+    ctx.beginPath();
+    ctx.moveTo(width * (0.2 + t * 0.5), height * (0.2 + t * 0.3));
+    ctx.lineTo(width * (0.15 + t * 0.6), height * (0.6 + t * 0.2));
+    ctx.stroke();
+  }
+
+  ctx.restore();
+};
+
+const drawTreeObstacle = (ctx, obstacle, cam) => {
+  const x = obstacle.x - cam.x;
+  const y = obstacle.y - cam.y;
+  const { width, height } = obstacle;
+  const canopyColor = obstacleStyles.tree || '#2f5d31';
+  ctx.save();
+  ctx.translate(x, y);
+
+  ctx.save();
+  ctx.globalAlpha = 0.3;
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+  ctx.beginPath();
+  ctx.ellipse(width / 2, height * 0.88, width * 0.48, height * 0.2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.fillStyle = '#5c3b21';
+  const trunkWidth = Math.max(6, width * 0.18);
+  ctx.fillRect(width / 2 - trunkWidth / 2, height * 0.5, trunkWidth, height * 0.45);
+
+  const radial = ctx.createRadialGradient(width / 2, height * 0.35, width * 0.2, width / 2, height * 0.35, width * 0.6);
+  radial.addColorStop(0, lightenColor(canopyColor, 0.38));
+  radial.addColorStop(0.6, canopyColor);
+  radial.addColorStop(1, darkenColor(canopyColor, 0.4));
+  ctx.fillStyle = radial;
+  ctx.beginPath();
+  ctx.ellipse(width / 2, height * 0.38, width * 0.55, height * 0.45, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.arc(width / 2, height * 0.35, width * 0.28, 0.4, Math.PI);
+  ctx.stroke();
+
+  ctx.fillStyle = lightenColor(canopyColor, 0.5);
+  for (let i = 0; i < 6; i += 1) {
+    const angle = (i / 6) * Math.PI * 2;
+    const leafX = width / 2 + Math.cos(angle) * width * 0.22;
+    const leafY = height * 0.38 + Math.sin(angle) * height * 0.2;
+    ctx.globalAlpha = 0.35;
+    ctx.beginPath();
+    ctx.ellipse(leafX, leafY, width * 0.16, height * 0.12, angle, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  ctx.restore();
+};
+
+const drawStumpObstacle = (ctx, obstacle, cam) => {
+  const x = obstacle.x - cam.x;
+  const y = obstacle.y - cam.y;
+  const { width, height } = obstacle;
+  const baseColor = obstacleStyles.stump || '#6b4b2b';
+  ctx.save();
+  ctx.translate(x, y);
+
+  ctx.save();
+  ctx.globalAlpha = 0.35;
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+  ctx.beginPath();
+  ctx.ellipse(width / 2, height * 0.95, width * 0.45, height * 0.18, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  const gradient = ctx.createLinearGradient(0, 0, 0, height);
+  gradient.addColorStop(0, lightenColor(baseColor, 0.25));
+  gradient.addColorStop(1, darkenColor(baseColor, 0.3));
+  ctx.fillStyle = gradient;
+  drawRoundedRectPath(ctx, 0, height * 0.3, width, height * 0.7, Math.min(width, height) * 0.2);
+  ctx.fill();
+
+  const topGradient = ctx.createRadialGradient(width / 2, height * 0.3, width * 0.1, width / 2, height * 0.3, width * 0.4);
+  topGradient.addColorStop(0, lightenColor(baseColor, 0.4));
+  topGradient.addColorStop(1, darkenColor(baseColor, 0.25));
+  ctx.fillStyle = topGradient;
+  ctx.beginPath();
+  ctx.ellipse(width / 2, height * 0.3, width * 0.45, height * 0.25, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(92, 58, 28, 0.75)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.ellipse(width / 2, height * 0.3, width * 0.36, height * 0.18, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.ellipse(width / 2, height * 0.3, width * 0.22, height * 0.1, 0, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.restore();
+};
+
+const drawWaterObstacle = (ctx, obstacle, cam) => {
+  const x = obstacle.x - cam.x;
+  const y = obstacle.y - cam.y;
+  const { width, height } = obstacle;
+  const baseColor = obstacleStyles.water || '#2a4f66';
+  ctx.save();
+  ctx.translate(x, y);
+
+  const radius = Math.min(width, height) * 0.12;
+  const gradient = ctx.createLinearGradient(0, 0, 0, height);
+  gradient.addColorStop(0, lightenColor(baseColor, 0.3));
+  gradient.addColorStop(0.5, baseColor);
+  gradient.addColorStop(1, darkenColor(baseColor, 0.4));
+  ctx.fillStyle = gradient;
+  drawRoundedRectPath(ctx, 0, 0, width, height, radius);
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(18, 30, 42, 0.4)';
+  ctx.lineWidth = Math.max(2, radius * 0.35);
+  drawRoundedRectPath(ctx, 0, 0, width, height, radius);
+  ctx.stroke();
+
+  ctx.save();
+  ctx.globalAlpha = 0.4;
+  ctx.strokeStyle = lightenColor(baseColor, 0.5);
+  ctx.lineWidth = 1.8;
+  const waveSpacing = Math.max(12, height / 8);
+  for (let waveY = waveSpacing * 0.5; waveY < height; waveY += waveSpacing) {
+    ctx.beginPath();
+    ctx.moveTo(radius, waveY);
+    ctx.bezierCurveTo(width * 0.35, waveY - waveSpacing * 0.35, width * 0.65, waveY + waveSpacing * 0.35, width - radius, waveY);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalAlpha = 0.45;
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+  for (let i = 0; i < 4; i += 1) {
+    const t = i / 4;
+    ctx.beginPath();
+    ctx.ellipse(width * (0.2 + t * 0.6), height * (0.2 + Math.sin((t + 1) * 3) * 0.05), width * 0.08, height * 0.04, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+
+  ctx.restore();
+};
+
+const drawDefaultObstacle = (ctx, obstacle, cam) => {
   const screenX = obstacle.x - cam.x;
   const screenY = obstacle.y - cam.y;
-  const width = obstacle.width;
-  const height = obstacle.height;
-  ctx.fillStyle = obstacleStyles[obstacle.type] || '#6b6b6b';
+  const { width, height } = obstacle;
+  const baseColor = obstacleStyles[obstacle.type] || '#6b6b6b';
+  const gradient = ctx.createLinearGradient(0, screenY, 0, screenY + height);
+  gradient.addColorStop(0, lightenColor(baseColor, 0.2));
+  gradient.addColorStop(1, darkenColor(baseColor, 0.25));
+  ctx.fillStyle = gradient;
   ctx.fillRect(screenX, screenY, width, height);
   ctx.strokeStyle = 'rgba(12, 18, 22, 0.35)';
   ctx.lineWidth = 2;
   ctx.strokeRect(screenX, screenY, width, height);
+};
+
+const obstacleRenderers = {
+  wall: drawWallObstacle,
+  rock: drawRockObstacle,
+  tree: drawTreeObstacle,
+  stump: drawStumpObstacle,
+  water: drawWaterObstacle
+};
+
+const drawObstacle = (ctx, obstacle, cam) => {
+  const renderer = obstacleRenderers[obstacle.type];
+  if (renderer) {
+    renderer(ctx, obstacle, cam);
+    return;
+  }
+  drawDefaultObstacle(ctx, obstacle, cam);
 };
 
 const drawProp = (ctx, prop, cam) => {
@@ -1026,10 +1763,7 @@ const drawProp = (ctx, prop, cam) => {
   if (prop.sprite && prop.spriteReady) {
     ctx.drawImage(prop.sprite, screenX, screenY, prop.width, prop.height);
   } else {
-    ctx.fillStyle = prop.color;
-    ctx.fillRect(screenX, screenY, prop.width, prop.height);
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
-    ctx.strokeRect(screenX, screenY, prop.width, prop.height);
+    drawGenericProp(ctx, prop, cam);
   }
 };
 
@@ -1478,11 +2212,19 @@ export function createDemoWorld() {
 }
 
 export function drawWorld(ctx, world, camera) {
-  ctx.fillStyle = '#244534';
-  ctx.fillRect(0, 0, camera.width, camera.height);
-  drawParallax(ctx, camera);
+  const terrainName = world?.currentRoom?.terrain;
+  const theme = getTerrainTheme(terrainName);
 
-  if (!world.currentRoom) return;
+  drawTerrainBase(ctx, camera, theme);
+  drawParallax(ctx, camera, theme);
+
+  if (!world.currentRoom) {
+    applyAmbientLight(ctx, camera, theme);
+    applyFog(ctx, camera, theme);
+    applyBloom(ctx, camera, theme);
+    applyVignette(ctx, camera, theme);
+    return;
+  }
 
   const drawables = [];
   for (const obstacle of world.currentRoom.obstacles) {
@@ -1506,6 +2248,11 @@ export function drawWorld(ctx, world, camera) {
       drawProp(ctx, item.ref, camera);
     }
   }
+
+  applyAmbientLight(ctx, camera, theme);
+  applyFog(ctx, camera, theme);
+  applyBloom(ctx, camera, theme);
+  applyVignette(ctx, camera, theme);
 }
 
 export function loadRoom(roomData, worldInstance = activeWorld) {
