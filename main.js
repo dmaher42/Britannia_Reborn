@@ -1,4 +1,4 @@
-import { createDemoWorld, drawWorld } from './world.js';
+import { createDemoWorld, drawWorld, RoomLibrary } from './world.js';
 import { Party, CharacterClass } from './party.js';
 import { Inventory } from './inventory.js';
 import { Spellbook, castFireDart } from './spells.js';
@@ -12,6 +12,19 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 
 const world = createDemoWorld();
+
+const roomIds = Object.keys(RoomLibrary);
+let currentRoomId = 'lordBritishCastle';
+if (!RoomLibrary[currentRoomId]) {
+  currentRoomId = RoomLibrary.meadow ? 'meadow' : roomIds[0];
+}
+if (!RoomLibrary[currentRoomId] && roomIds.length > 0) {
+  currentRoomId = roomIds[0];
+}
+const travelDestinations = roomIds.map((id) => ({
+  id,
+  name: RoomLibrary[id]?.name ?? id
+}));
 
 const party = new Party(
   [
@@ -38,6 +51,9 @@ const ui = setupUI({
   inventory,
   spellbook,
   combat,
+  destinations: travelDestinations,
+  currentDestinationId: currentRoomId,
+  onTravel: travelTo,
   onTalk: () => {
     const speaker = party.leader;
     ui.log(`${speaker.name} trades words with a wary villager.`);
@@ -71,8 +87,8 @@ const ui = setupUI({
   }
 });
 
-ui.log('The Avatar stands before Castle Britannia, seat of Lord British.');
-ui.showToast("Welcome to the castle keep of Lord British.");
+ui.log('The Avatar steps into the expanded courtyard of Castle Britannia, its new wings bustling with life.');
+ui.showToast('Castle Britannia opens new wings to explore. Select a destination to travel.');
 
 const camera = { x: 0, y: 0, width: 0, height: 0, deadzone: { width: 320, height: 220 } };
 const deviceRatio = Math.min(window.devicePixelRatio || 1, 2);
@@ -107,6 +123,12 @@ resize();
 
 let lastStatus = '';
 let lastTerrain = '';
+
+const areaName = () => world.currentRoom?.name ?? 'the wilds';
+const areaNameWithArticle = () => {
+  const name = areaName();
+  return name.toLowerCase().startsWith('the ') ? name : `the ${name}`;
+};
 
 function updateStatus(text) {
   if (text !== lastStatus) {
@@ -158,6 +180,48 @@ function updateCamera(forceCenter = false) {
   camera.y = clamp(camera.y, 0, Math.max(0, height - camera.height));
 }
 
+async function travelTo(roomId) {
+  if (!roomId) return;
+  if (roomId === currentRoomId) {
+    const hereName = RoomLibrary[currentRoomId]?.name ?? areaName();
+    ui.showToast(`You are already exploring ${hereName}.`);
+    ui.setActiveDestination?.(currentRoomId);
+    return;
+  }
+
+  const destination = RoomLibrary[roomId];
+  if (!destination) {
+    ui.showToast('That destination has not yet been charted.');
+    return;
+  }
+
+  ui.setTravelBusy?.(true);
+  const destinationName = destination.name ?? destination.terrain ?? 'a distant locale';
+  ui.log(`Preparations begin for the journey to ${destinationName}.`);
+
+  try {
+    await world.loadRoom(destination);
+    currentRoomId = roomId;
+    party.placeAt(world.spawn.x, world.spawn.y);
+    updateCamera(true);
+    lastStatus = '';
+    lastTerrain = '';
+    const terrainInfo = world.terrainAtWorld();
+    updateTerrain(terrainInfo?.name ?? '-');
+    const arrivalName = destination.name ?? destination.terrain ?? 'a new locale';
+    updateStatus(`Arrived at ${arrivalName}.`);
+    ui.setActiveDestination?.(roomId);
+    ui.showToast(`Traveled to ${arrivalName}.`);
+    ui.log(`The party arrives at ${arrivalName}.`);
+  } catch (error) {
+    console.error(error);
+    ui.showToast('The moongates refuse the journey. Try again soon.');
+    ui.log('A tremor in the ether scatters the party, foiling the journey.');
+  } finally {
+    ui.setTravelBusy?.(false);
+  }
+}
+
 function update(dt) {
   const direction = input.getDirection();
   party.update(dt, world, direction);
@@ -171,9 +235,9 @@ function update(dt) {
     if (leader.isOverweight()) {
       updateStatus(`${leader.name} is slowed by the weight of their gear.`);
     } else if (direction.x !== 0 || direction.y !== 0) {
-      updateStatus('Exploring the castle grounds...');
+      updateStatus(`Exploring ${areaName()}...`);
     } else {
-      updateStatus('Use WASD or the arrow keys to tour the castle courtyard.');
+      updateStatus(`Use WASD or the arrow keys to explore ${areaNameWithArticle()}.`);
     }
   }
 }
@@ -221,6 +285,9 @@ function frame(now) {
 async function init() {
   await world.ready;
   party.placeAt(world.spawn.x, world.spawn.y);
+  const terrainInfo = world.terrainAtWorld();
+  updateTerrain(terrainInfo?.name ?? '-');
+  ui.setActiveDestination?.(currentRoomId);
   updateCamera(true);
   lastTime = performance.now();
   requestAnimationFrame(frame);

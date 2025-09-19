@@ -14,6 +14,7 @@ been rebuilt with clarity and testable rules.
 - **Spellcasting:** Fire Dart consumes Sulfur Ash + Black Pearl and MP.
 - **Skirmish stub:** trigger a lightweight combat loop to test turn transitions.
 - **UI panels:** party vitals, carry limits, and shared inventory totals update live.
+- **Destinations panel:** fast travel between the expanded Castle Britannia, the Whispering Forest Glade, the Stormlit Drowned Coast, and the outskirts meadow.
 
 ## Developing
 Install dependencies and run tests with [Vitest](https://vitest.dev/):
