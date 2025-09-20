@@ -103,7 +103,7 @@ export class WorldObject {
     const { type } = data;
     const Class = type ? WORLD_OBJECT_REGISTRY[type] : undefined;
 
-    if (Class && typeof Class.fromJSON === 'function') {
+    if (Class && typeof Class.fromJSON === 'function' && Class.fromJSON !== WorldObject.fromJSON) {
       return Class.fromJSON(data);
     }
 
