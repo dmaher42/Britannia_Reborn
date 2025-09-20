@@ -64,12 +64,23 @@ export class SaveManager {
   }
 }
 
-export const buildSaveData = ({ character, player, map, inventory }) => ({
-  character: character?.toJSON?.() ?? null,
-  player: player?.toJSON?.() ?? null,
-  world: map?.toJSON?.() ?? null,
-  inventory: inventory?.toJSON?.() ?? [],
-  inventoryGold: inventory?.gold ?? 0,
-  timestamp: Date.now(),
-});
+export const buildSaveData = ({ party, map, inventory, character, player, triggers }) => {
+  if (party) {
+    return {
+      party: party?.toJSON?.() ?? null,
+      world: map?.toJSON?.() ?? null,
+      inventory: inventory?.toJSON?.() ?? [],
+      triggers: Array.isArray(triggers) ? [...triggers] : null,
+      timestamp: Date.now(),
+    };
+  }
+  return {
+    character: character?.toJSON?.() ?? null,
+    player: player?.toJSON?.() ?? null,
+    world: map?.toJSON?.() ?? null,
+    inventory: inventory?.toJSON?.() ?? [],
+    inventoryGold: inventory?.gold ?? 0,
+    timestamp: Date.now(),
+  };
+};
 

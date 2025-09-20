@@ -106,34 +106,6 @@ canvas#game {
   letter-spacing: 0.02em;
 }
 
-.character-name {
-  font-size: 16px;
-  font-weight: 600;
-  margin-bottom: 10px;
-  color: #ffe18f;
-}
-
-.character-vitals {
-  display: flex;
-  gap: 12px;
-  font-size: 14px;
-  color: #cfe2ff;
-}
-
-.character-vitals span:last-child {
-  font-weight: 600;
-}
-
-.stat-list {
-  list-style: none;
-  margin: 12px 0 0;
-  padding: 0;
-  display: grid;
-  gap: 6px;
-  font-size: 13px;
-  color: #a8c4ff;
-}
-
 .world-info {
   display: grid;
   gap: 6px;
@@ -192,81 +164,147 @@ canvas#game {
   justify-content: space-between;
 }
 
-.equipped-list,
 .inventory-list {
-  list-style: none;
-  margin: 12px 0 0;
-  padding: 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  margin-top: 12px;
 }
 
-.equipped-slot {
+.inventory-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: rgba(14, 24, 40, 0.8);
-  padding: 10px 12px;
-  border-radius: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(12, 22, 38, 0.82);
+  border: 1px solid rgba(112, 168, 255, 0.2);
   font-size: 13px;
+  color: #d7e4ff;
+  cursor: grab;
 }
 
-.equipped-slot strong {
-  color: #fddc7a;
+.inventory-item:active {
+  cursor: grabbing;
+}
+
+.inventory-item:hover {
+  border-color: rgba(158, 206, 255, 0.4);
+}
+
+.inventory-item .item-name {
   font-weight: 600;
 }
 
-.equipped-slot button {
-  margin-left: 12px;
-  padding: 6px 10px;
-  border-radius: 10px;
-  border: 1px solid rgba(140, 184, 255, 0.35);
-  background: rgba(24, 42, 68, 0.85);
-  color: #e5f1ff;
+.inventory-item .item-weight {
+  color: #9ab8f2;
   font-size: 12px;
-  cursor: pointer;
 }
 
-.inventory-entry {
+.party-portraits {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.party-portrait {
   display: grid;
   gap: 6px;
   padding: 12px 14px;
   border-radius: 14px;
-  background: rgba(12, 22, 38, 0.82);
-  border: 1px solid rgba(112, 168, 255, 0.18);
-  font-size: 13px;
+  background: rgba(14, 24, 40, 0.82);
+  border: 1px solid rgba(116, 172, 255, 0.2);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
 }
 
-.inventory-entry .entry-title {
+.party-portrait.selected {
+  border-color: rgba(255, 224, 140, 0.75);
+  box-shadow: 0 0 0 2px rgba(255, 224, 140, 0.25);
+}
+
+.party-portrait.leader {
+  border-color: rgba(173, 220, 255, 0.75);
+}
+
+.party-portrait.has-target::after {
+  content: attr(data-target);
+  display: block;
+  font-size: 11px;
+  color: #ffcdd2;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.party-portrait .portrait-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.party-portrait .portrait-class {
+  font-size: 12px;
+  color: #9eb9ff;
+}
+
+.party-portrait .bar {
+  width: 100%;
+  height: 6px;
+  border-radius: 6px;
+  background: rgba(10, 18, 32, 0.9);
+  overflow: hidden;
+}
+
+.party-portrait .bar div {
+  height: 100%;
+}
+
+.party-portrait .bar.health div {
+  background: linear-gradient(90deg, #8bc34a, #66bb6a);
+}
+
+.party-portrait .bar.mana div {
+  background: linear-gradient(90deg, #64b5f6, #4fc3f7);
+}
+
+.equipment-slots {
+  display: grid;
+  gap: 12px;
+}
+
+.equipment-slot {
+  background: rgba(12, 22, 36, 0.82);
+  border-radius: 14px;
+  border: 1px solid rgba(122, 176, 255, 0.2);
+  padding: 12px;
+}
+
+.equipment-panel.highlight {
+  box-shadow: 0 0 0 2px rgba(173, 220, 255, 0.35);
+}
+
+.equipment-slot header {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #dbe8ff;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.equipment-slot .slot-body {
+  background: rgba(6, 14, 26, 0.85);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: #f1f6ff;
   display: flex;
   justify-content: space-between;
-  font-weight: 600;
+  align-items: center;
 }
 
-.inventory-entry p {
-  margin: 0;
-  color: #b7cef4;
-}
-
-.entry-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.entry-actions button {
-  flex: 0 0 auto;
-  padding: 6px 10px;
-  border-radius: 10px;
-  border: 1px solid rgba(116, 172, 255, 0.35);
-  background: rgba(24, 42, 68, 0.85);
-  color: #f2f7ff;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.entry-actions button:hover {
-  background: rgba(40, 64, 96, 0.92);
+.equipment-slot .slot-body span:last-child {
+  color: #9bbef8;
 }
 
 canvas[data-mode='look'],

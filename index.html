@@ -17,15 +17,6 @@
       </section>
     </main>
     <aside class="sidebar">
-      <section class="character-panel">
-        <header><h2>Avatar</h2></header>
-        <div class="character-name" id="characterName">Avatar</div>
-        <div class="character-vitals">
-          <div><span>HP</span><span id="hpLabel">-</span></div>
-          <div><span>MP</span><span id="mpLabel">-</span></div>
-        </div>
-        <ul id="statList" class="stat-list"></ul>
-      </section>
       <section class="world-panel">
         <header><h2>World</h2></header>
         <div class="world-info">
@@ -36,16 +27,23 @@
           <button id="saveButton" type="button">Save</button>
           <button id="loadButton" type="button">Load</button>
         </div>
-        <p class="controls-hint">WASD / Arrows move &bull; L: Look &bull; G: Get &bull; U: Use &bull; T: Talk &bull; I: Toggle inventory</p>
+        <p class="controls-hint">WASD / Arrows move &bull; L/G/U/T actions &bull; 1-8 select &bull; F: Formation &bull; SPACE: Pause &bull; I: Toggle inventory</p>
+      </section>
+      <section class="party-panel">
+        <header><h2>Party</h2></header>
+        <div id="partyPortraits" class="party-portraits"></div>
+      </section>
+      <section class="equipment-panel">
+        <header><h2>Equipment</h2></header>
+        <div id="equipmentSlots" class="equipment-slots"></div>
       </section>
       <section class="inventory-panel">
-        <header><h2>Inventory</h2></header>
+        <header><h2>Shared Inventory</h2></header>
         <div class="carry-info">
           <div><span>Equipped</span><span id="equippedWeight">0 / 0</span></div>
-          <div><span>Backpack</span><span id="backpackWeight">0 / 0</span></div>
+          <div><span>Shared</span><span id="sharedWeight">0 / 0</span></div>
         </div>
-        <ul id="equippedList" class="equipped-list"></ul>
-        <ul id="inventoryList" class="inventory-list"></ul>
+        <div id="sharedInventory" class="inventory-list"></div>
       </section>
     </aside>
   </div>

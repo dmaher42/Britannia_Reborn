@@ -22,6 +22,8 @@ export class InteractionSystem {
     messageDisplay,
     objectRenderer,
     onInventoryChange,
+    onEnemyTarget,
+    getSelectedMember,
   }) {
     this.canvas = canvas;
     this.map = map;
@@ -31,6 +33,8 @@ export class InteractionSystem {
     this.messageDisplay = messageDisplay;
     this.objectRenderer = objectRenderer;
     this.onInventoryChange = typeof onInventoryChange === 'function' ? onInventoryChange : null;
+    this.onEnemyTarget = typeof onEnemyTarget === 'function' ? onEnemyTarget : null;
+    this.getSelectedMember = typeof getSelectedMember === 'function' ? getSelectedMember : null;
     this.mode = null;
     this._onKeyDown = (event) => this.handleKeyDown(event);
     this._onKeyUp = (event) => this.handleKeyUp(event);
@@ -168,7 +172,11 @@ export class InteractionSystem {
   handleObjectClick(object, tile) {
     if (!this.mode) {
       if (object) {
-        this.messageDisplay?.log(object.onLook(this.createContext()));
+        if (object.type === 'enemy' && this.onEnemyTarget) {
+          this.onEnemyTarget(object);
+        } else {
+          this.messageDisplay?.log(object.onLook(this.createContext()));
+        }
       } else {
         this.lookAtTile(tile);
       }
@@ -306,12 +314,14 @@ export class InteractionSystem {
   }
 
   createContext() {
+    const selectedMember = this.getSelectedMember ? this.getSelectedMember() : this.character;
     return {
       map: this.map,
       world: this.map,
       inventory: this.inventory,
       player: this.player,
-      character: this.character,
+      character: selectedMember,
+      partyMember: selectedMember,
       messageDisplay: this.messageDisplay,
     };
   }

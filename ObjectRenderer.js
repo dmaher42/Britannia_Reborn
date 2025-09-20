@@ -4,6 +4,7 @@ const TYPE_COLORS = {
   container: '#b48a68',
   lever: '#5c6673',
   npc: '#8fa7c9',
+  enemy: '#f44336',
 };
 
 const HIGHLIGHT_COLOR = 'rgba(255, 255, 160, 0.55)';
@@ -53,6 +54,7 @@ export class ObjectRenderer {
 
     const tiles = new Map();
     objects.forEach((object) => {
+      if (object?.type === 'enemy') return;
       const key = `${object.x},${object.y}`;
       if (!tiles.has(key)) {
         tiles.set(key, []);

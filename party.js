@@ -1,4 +1,4 @@
-import { clamp } from './utils.js';
+import { PartyMember } from './PartyMember.js';
 
 export const CharacterClass = Object.freeze({
   Avatar: 'Avatar',
@@ -9,216 +9,173 @@ export const CharacterClass = Object.freeze({
   Mage: 'Mage',
   Druid: 'Druid',
   Tinker: 'Tinker',
-  Shepherd: 'Shepherd'
+  Shepherd: 'Shepherd',
 });
 
-const MP_RULES = {
-  [CharacterClass.Avatar]: (INT) => INT * 2,
-  [CharacterClass.LordBritish]: (INT) => INT * 2,
-  [CharacterClass.Bard]: (INT) => Math.floor(INT / 2),
-  [CharacterClass.Ranger]: (INT) => Math.floor(INT / 2)
+const asMember = (entry) => {
+  if (!entry) return null;
+  if (entry instanceof PartyMember) return entry;
+  if (typeof entry === 'string') {
+    return new PartyMember(entry, CharacterClass.Avatar);
+  }
+  if (typeof entry === 'object' && entry.name) {
+    return PartyMember.fromJSON(entry) ?? new PartyMember(entry.name, entry.class ?? CharacterClass.Avatar, entry);
+  }
+  return null;
 };
 
-const EQUIP_SLOTS = ['head', 'torso', 'hands', 'weapon', 'shield', 'ring'];
-
-const weightOf = (item) => {
-  if (!item) return 0;
-  const qty = typeof item.qty === 'number' ? item.qty : 1;
-  const weight = typeof item.weight === 'number' ? item.weight : 0;
-  return weight * qty;
-};
-
-export class Character {
-  constructor(options = {}) {
-    this.name = options.name ?? 'Adventurer';
-    this.cls = options.cls ?? CharacterClass.Avatar;
-    this.STR = options.STR ?? 8;
-    this.DEX = options.DEX ?? 8;
-    this.INT = options.INT ?? 8;
-    this.hpMax = typeof options.hpMax === 'number' ? options.hpMax : 20 + this.STR;
-    this.mpMax = this._computeMpMax();
-    this.hp = clamp(options.hp ?? this.hpMax, 0, this.hpMax);
-    this.mp = clamp(options.mp ?? this.mpMax, 0, this.mpMax);
-    this.baseSpeed = options.baseSpeed ?? 96;
-    this.x = options.x ?? 0;
-    this.y = options.y ?? 0;
-    this.equipment = {};
-    EQUIP_SLOTS.forEach((slot) => {
-      this.equipment[slot] = null;
-    });
-    this.backpack = [];
-  }
-
-  _computeMpMax() {
-    const rule = MP_RULES[this.cls];
-    if (!rule) return 0;
-    const mp = rule(this.INT);
-    return Math.max(0, Math.floor(mp));
-  }
-
-  equippedWeight() {
-    return EQUIP_SLOTS.reduce((total, slot) => total + weightOf(this.equipment[slot]), 0);
-  }
-
-  backpackWeight() {
-    return this.backpack.reduce((total, item) => total + weightOf(item), 0);
-  }
-
-  equip(item) {
-    if (!item || !item.equip) return false;
-    const slot = item.equip;
-    if (!Object.prototype.hasOwnProperty.call(this.equipment, slot)) return false;
-    const itemWeight = weightOf(item);
-    const currentWeight = weightOf(this.equipment[slot]);
-    const newTotal = this.equippedWeight() - currentWeight + itemWeight;
-    if (newTotal > this.STR) return false;
-    this.equipment[slot] = { ...item };
-    return true;
-  }
-
-  addToBackpack(item) {
-    if (!item) return false;
-    const itemWeight = weightOf(item);
-    if (this.backpackWeight() + itemWeight > this.STR * 2) return false;
-    this.backpack.push({ ...item });
-    return true;
-  }
-
-  isOverweight() {
-    return this.equippedWeight() > this.STR || this.backpackWeight() > this.STR * 2;
-  }
-
-  speed() {
-    return this.isOverweight() ? this.baseSpeed * 0.6 : this.baseSpeed;
-  }
-}
+const FORMATIONS = ['line', 'box', 'scattered'];
 
 export class Party {
-  constructor(members = [], options = {}) {
-    this.members = members.map((member) => (member instanceof Character ? member : new Character(member)));
+  constructor(options = {}) {
+    this.members = Array.isArray(options.members)
+      ? options.members.map((member) => asMember(member)).filter(Boolean)
+      : [];
+    this.maxMembers = Number.isFinite(options.maxMembers) ? Math.max(1, Math.round(options.maxMembers)) : 8;
+    this.formation = FORMATIONS.includes(options.formation) ? options.formation : 'line';
+    this.sharedInventory = Array.isArray(options.sharedInventory)
+      ? [...options.sharedInventory]
+      : [];
+    this.movementController = null;
     this.leaderIndex = 0;
-    this.followSpacing = options.followSpacing ?? 36;
-    this.collisionRadius = options.collisionRadius ?? 14;
-  }
-
-  get size() {
-    return this.members.length;
+    if (Number.isFinite(options.leaderIndex)) {
+      this.setLeader(options.leaderIndex);
+    } else if (this.members.length > 0) {
+      this.leaderIndex = 0;
+    }
   }
 
   get leader() {
     return this.members[this.leaderIndex] ?? null;
   }
 
-  setLeader(index) {
-    if (index >= 0 && index < this.members.length) {
-      this.leaderIndex = index;
+  get size() {
+    return this.members.length;
+  }
+
+  setMovementController(controller) {
+    this.movementController = controller ?? null;
+  }
+
+  addMember(entry) {
+    if (this.members.length >= this.maxMembers) {
+      return { success: false, message: 'The party cannot grow any larger.' };
     }
+    const member = asMember(entry);
+    if (!member) {
+      return { success: false, message: 'That companion cannot join.' };
+    }
+    this.members.push(member);
+    if (!this.leader) {
+      this.leaderIndex = this.members.length - 1;
+    }
+    return { success: true, member };
   }
 
-  placeAt(x, y) {
-    if (!this.leader) return;
-    this.members.forEach((member, index) => {
-      member.x = x - index * (this.followSpacing * 0.8);
-      member.y = y + index * 6;
-    });
+  removeMember(id) {
+    const index = this.members.findIndex((member) => member.id === id || member.name === id);
+    if (index === -1) return null;
+    const [removed] = this.members.splice(index, 1);
+    if (this.leaderIndex >= this.members.length) {
+      this.leaderIndex = Math.max(0, this.members.length - 1);
+    }
+    return removed ?? null;
   }
 
-  update(dt, world, direction = { x: 0, y: 0 }) {
-    this.moveLeader(dt, world, direction);
-    this.followMembers(dt, world);
+  setLeader(index) {
+    const normalized = Number.isFinite(index) ? Math.max(0, Math.min(this.members.length - 1, Math.round(index))) : 0;
+    if (!this.members[normalized]) return false;
+    this.leaderIndex = normalized;
+    return true;
   }
 
-  moveLeader(dt, world, direction = { x: 0, y: 0 }) {
+  cycleLeader(step = 1) {
+    if (this.members.length === 0) return this.leaderIndex;
+    const next = (this.leaderIndex + step + this.members.length) % this.members.length;
+    this.setLeader(next);
+    return this.leaderIndex;
+  }
+
+  setFormation(name) {
+    if (!FORMATIONS.includes(name)) return false;
+    this.formation = name;
+    if (this.movementController && typeof this.movementController.setFormation === 'function') {
+      this.movementController.setFormation(name);
+    }
+    return true;
+  }
+
+  cycleFormation() {
+    const index = FORMATIONS.indexOf(this.formation);
+    const nextIndex = index === -1 ? 0 : (index + 1) % FORMATIONS.length;
+    this.setFormation(FORMATIONS[nextIndex]);
+    return this.formation;
+  }
+
+  moveParty(direction, dt = 0.016, gameWorld = null) {
+    if (this.movementController && typeof this.movementController.moveParty === 'function') {
+      this.movementController.moveParty(direction, dt, gameWorld);
+      return;
+    }
     const leader = this.leader;
     if (!leader) return;
-    const speed = leader.speed();
-    const vx = direction.x ?? 0;
-    const vy = direction.y ?? 0;
+    const speed = Number.isFinite(direction?.speed) ? direction.speed : 3.5;
+    const vx = direction?.x ?? 0;
+    const vy = direction?.y ?? 0;
     if (vx === 0 && vy === 0) return;
-
-    const stepX = vx * speed * dt;
-    const stepY = vy * speed * dt;
-    const radius = this.collisionRadius;
-
-    if (world && typeof world.resolveMovement === 'function') {
-      const collider = {
-        x: leader.x - radius,
-        y: leader.y - radius,
-        width: radius * 2,
-        height: radius * 2
-      };
-      world.resolveMovement(collider, stepX, stepY);
-      leader.x = collider.x + radius;
-      leader.y = collider.y + radius;
-    } else {
-      if (!world || world.isWalkableCircle(leader.x + stepX, leader.y, radius)) {
-        leader.x += stepX;
-      }
-      if (!world || world.isWalkableCircle(leader.x, leader.y + stepY, radius)) {
-        leader.y += stepY;
-      }
-
-      if (world) {
-        const clamped = world.clampPosition(leader.x, leader.y, radius);
-        leader.x = clamped.x;
-        leader.y = clamped.y;
-      }
+    const length = Math.hypot(vx, vy) || 1;
+    const step = speed * dt;
+    const nextX = leader.x + (vx / length) * step;
+    const nextY = leader.y + (vy / length) * step;
+    if (!gameWorld || gameWorld.canMoveTo?.(nextX, nextY) || gameWorld.isWalkableCircle?.(nextX, nextY, 0.3)) {
+      leader.setPosition(nextX, nextY);
     }
   }
 
-  followMembers(dt, world) {
-    const radius = this.collisionRadius;
-    for (let i = 1; i < this.members.length; i += 1) {
-      const prev = this.members[i - 1];
-      const follower = this.members[i];
-      const dx = prev.x - follower.x;
-      const dy = prev.y - follower.y;
-      const dist = Math.hypot(dx, dy);
-      if (dist < 1e-3) continue;
+  totalCarryCapacity() {
+    return this.members.reduce((total, member) => total + member.weightCapacity, 0);
+  }
 
-      const desired = this.followSpacing;
-      if (dist > desired) {
-        const move = Math.min(dist - desired, follower.speed() * dt);
-        const nx = dx / dist;
-        const ny = dy / dist;
+  totalEquippedWeight() {
+    return this.members.reduce((total, member) => total + member.equippedWeight(), 0);
+  }
 
-        if (world && typeof world.resolveMovement === 'function') {
-          const collider = {
-            x: follower.x - radius,
-            y: follower.y - radius,
-            width: radius * 2,
-            height: radius * 2
-          };
-          world.resolveMovement(collider, nx * move, ny * move);
-          follower.x = collider.x + radius;
-          follower.y = collider.y + radius;
-        } else {
-          let nextX = follower.x + nx * move;
-          let nextY = follower.y + ny * move;
+  getSharedWeight() {
+    return this.sharedInventory.reduce((total, item) => {
+      const weight = Number.isFinite(item?.weight)
+        ? item.weight
+        : Number.isFinite(item?.stats?.weight)
+        ? item.stats.weight
+        : 0;
+      return total + weight;
+    }, 0);
+  }
 
-          if (world && !world.isWalkableCircle(nextX, nextY, radius)) {
-            if (world.isWalkableCircle(follower.x + nx * move, follower.y, radius)) {
-              nextX = follower.x + nx * move;
-            } else {
-              nextX = follower.x;
-            }
-            if (world.isWalkableCircle(follower.x, follower.y + ny * move, radius)) {
-              nextY = follower.y + ny * move;
-            } else {
-              nextY = follower.y;
-            }
-          }
+  getAvailableInventorySpace() {
+    const capacity = this.totalCarryCapacity();
+    const carried = this.totalEquippedWeight() + this.getSharedWeight();
+    return Math.max(0, capacity - carried);
+  }
 
-          if (world) {
-            const clamped = world.clampPosition(nextX, nextY, radius);
-            nextX = clamped.x;
-            nextY = clamped.y;
-          }
+  toJSON() {
+    return {
+      members: this.members.map((member) => member.toJSON()),
+      maxMembers: this.maxMembers,
+      leaderIndex: this.leaderIndex,
+      formation: this.formation,
+      sharedInventory: this.sharedInventory.map((item) => (item?.toJSON ? item.toJSON() : item)),
+    };
+  }
 
-          follower.x = nextX;
-          follower.y = nextY;
-        }
-      }
-    }
+  static fromJSON(data) {
+    if (!data || typeof data !== 'object') return new Party();
+    return new Party({
+      members: Array.isArray(data.members) ? data.members : [],
+      maxMembers: data.maxMembers,
+      leaderIndex: data.leaderIndex,
+      formation: data.formation,
+      sharedInventory: data.sharedInventory,
+    });
   }
 }
+
