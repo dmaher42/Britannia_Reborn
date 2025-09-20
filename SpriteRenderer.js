@@ -1,14 +1,9 @@
-const SPRITE_SHEETS = [
-  { key: 'characters', file: 'characters.png' },
-  { key: 'monsters', file: 'monsters.png' },
-  { key: 'items', file: 'items.png' },
-  { key: 'tiles', file: 'tiles.png' },
-  { key: 'effects', file: 'effects.png' },
-  { key: 'ui', file: 'ui.png' },
-];
+import { PlaceholderGraphics } from './PlaceholderGraphics.js';
+
+const SPRITE_SHEETS = ['characters', 'monsters', 'items', 'tiles', 'effects', 'ui'];
 
 export class SpriteRenderer {
-  constructor(canvas, context) {
+  constructor(canvas, context, options = {}) {
     this.canvas = canvas;
     this.ctx = context ?? canvas?.getContext?.('2d') ?? null;
     this.spriteSheets = new Map();
@@ -16,6 +11,13 @@ export class SpriteRenderer {
     this.scale = 2;
     this.loadingPromises = [];
     this.ready = false;
+    this.loadingAttempts = new Map();
+
+    const { placeholderGraphics = null } = options ?? {};
+    this.placeholderGraphics =
+      placeholderGraphics ??
+      (typeof document !== 'undefined' ? new PlaceholderGraphics() : null);
+
     if (this.ctx) {
       this.ctx.imageSmoothingEnabled = false;
     }
@@ -23,30 +25,66 @@ export class SpriteRenderer {
   }
 
   loadSpriteSheets() {
-    SPRITE_SHEETS.forEach((sheet) => this.loadSpriteSheet(sheet.key, sheet.file));
+    SPRITE_SHEETS.forEach((sheetName) => this.loadSpriteSheet(sheetName));
   }
 
-  loadSpriteSheet(name, file) {
-    if (!this.canvas) return;
+  loadSpriteSheet(name) {
+    const placeholder = this.placeholderGraphics?.getSheet?.(name) ?? null;
+    const record = {
+      image: placeholder,
+      loaded: Boolean(placeholder),
+      isPlaceholder: Boolean(placeholder),
+      error: null,
+    };
+    this.spriteSheets.set(name, record);
+    this.updateReadyState();
+
+    const canLoadImages = typeof Image !== 'undefined';
+    if (!canLoadImages) {
+      return;
+    }
+
     const image = new Image();
     image.decoding = 'async';
-    const src = new URL(`./assets/${file}`, import.meta.url).href;
-    const record = { image, loaded: false };
-    this.spriteSheets.set(name, record);
-    const promise = new Promise((resolve, reject) => {
+    const src = new URL(`./assets/${name}.png`, import.meta.url).href;
+
+    const promise = new Promise((resolve) => {
       image.addEventListener('load', () => {
+        record.image = image;
         record.loaded = true;
-        this.ready = SPRITE_SHEETS.every((sheet) => this.spriteSheets.get(sheet.key)?.loaded);
+        record.isPlaceholder = false;
+        record.error = null;
+        this.loadingAttempts.set(name, (this.loadingAttempts.get(name) ?? 0) + 1);
+        this.updateReadyState();
+        console.log(`✅ Loaded sprite sheet: ${name}`);
         resolve(image);
       });
+
       image.addEventListener('error', (event) => {
-        console.warn(`Failed to load sprite sheet ${name} from ${file}`, event);
-        record.error = event?.error ?? new Error(`Failed to load ${file}`);
+        record.error = event?.error ?? new Error(`Failed to load ${name}.png`);
+        this.loadingAttempts.set(name, (this.loadingAttempts.get(name) ?? 0) + 1);
+        if (placeholder) {
+          record.image = placeholder;
+          record.loaded = true;
+          record.isPlaceholder = true;
+          console.log(`⚠️ Using placeholder for: ${name}`);
+          console.log(`✅ Placeholder ready for: ${name}`);
+        } else {
+          record.loaded = false;
+          record.isPlaceholder = false;
+          console.error(`❌ No placeholder available for: ${name}`);
+        }
+        this.updateReadyState();
         resolve(null);
       });
     });
+
     this.loadingPromises.push(promise);
     image.src = src;
+  }
+
+  updateReadyState() {
+    this.ready = SPRITE_SHEETS.every((sheetName) => this.spriteSheets.get(sheetName)?.loaded);
   }
 
   setScale(scale) {
@@ -55,46 +93,101 @@ export class SpriteRenderer {
   }
 
   whenReady() {
-    return Promise.all(this.loadingPromises);
+    if (this.loadingPromises.length === 0) {
+      return Promise.resolve(this.ready);
+    }
+    return Promise.all(this.loadingPromises).then(() => this.ready);
   }
 
   getSheet(name) {
     const record = this.spriteSheets.get(name);
-    if (record?.loaded) {
+    if (!record) {
+      return null;
+    }
+    if (record.loaded && record.image) {
+      return record.image;
+    }
+    if (record.image) {
       return record.image;
     }
     return null;
   }
 
-  drawSprite(sheetName, sourceX, sourceY, destX, destY, width = this.tileSize, height = this.tileSize, options = {}) {
+  drawSprite(
+    sheetName,
+    sourceX,
+    sourceY,
+    destX,
+    destY,
+    width = this.tileSize,
+    height = this.tileSize,
+    options = {},
+  ) {
     if (!this.ctx) return;
     const sheet = this.getSheet(sheetName);
-    if (!sheet) return;
     const scale = Number.isFinite(options.scale) ? options.scale : this.scale;
     const destWidth = (options.destWidth ?? width) * scale;
     const destHeight = (options.destHeight ?? height) * scale;
     const dx = Math.round(destX);
     const dy = Math.round(destY);
-    this.ctx.save();
-    this.ctx.imageSmoothingEnabled = false;
-    if (options.flipX || options.flipY) {
-      this.ctx.translate(dx + destWidth / 2, dy + destHeight / 2);
-      this.ctx.scale(options.flipX ? -1 : 1, options.flipY ? -1 : 1);
-      this.ctx.drawImage(
-        sheet,
-        sourceX,
-        sourceY,
-        width,
-        height,
-        -destWidth / 2,
-        -destHeight / 2,
-        destWidth,
-        destHeight,
-      );
-    } else {
-      this.ctx.drawImage(sheet, sourceX, sourceY, width, height, dx, dy, destWidth, destHeight);
+
+    if (sheet) {
+      this.ctx.save();
+      this.ctx.imageSmoothingEnabled = false;
+      if (options.flipX || options.flipY) {
+        this.ctx.translate(dx + destWidth / 2, dy + destHeight / 2);
+        this.ctx.scale(options.flipX ? -1 : 1, options.flipY ? -1 : 1);
+        this.ctx.drawImage(
+          sheet,
+          sourceX,
+          sourceY,
+          width,
+          height,
+          -destWidth / 2,
+          -destHeight / 2,
+          destWidth,
+          destHeight,
+        );
+      } else {
+        this.ctx.drawImage(sheet, sourceX, sourceY, width, height, dx, dy, destWidth, destHeight);
+      }
+      this.ctx.restore();
+      return;
     }
+
+    this.drawPlaceholderRect(dx, dy, sheetName, destWidth, destHeight);
+  }
+
+  drawPlaceholderRect(destX, destY, sheetName, destWidth, destHeight) {
+    if (!this.ctx) return;
+    const colors = {
+      characters: '#4169E1',
+      monsters: '#DC143C',
+      items: '#FFD700',
+      tiles: '#228B22',
+      effects: '#FF1493',
+      ui: '#708090',
+    };
+
+    this.ctx.save();
+    this.ctx.fillStyle = colors[sheetName] ?? '#FF00FF';
+    this.ctx.fillRect(destX, destY, destWidth, destHeight);
+    this.ctx.strokeStyle = '#000000';
+    this.ctx.lineWidth = 1;
+    this.ctx.strokeRect(destX, destY, destWidth, destHeight);
     this.ctx.restore();
+  }
+
+  testPlaceholders() {
+    const testSheets = ['characters', 'monsters', 'items', 'tiles', 'effects', 'ui'];
+    console.log('Testing placeholder graphics...');
+    testSheets.forEach((sheet) => {
+      if (this.spriteSheets.has(sheet)) {
+        console.log(`✅ ${sheet}: Ready`);
+      } else {
+        console.log(`❌ ${sheet}: Missing`);
+      }
+    });
   }
 
   drawAnimatedSprite(animation, frameIndex, destX, destY, options = {}) {
