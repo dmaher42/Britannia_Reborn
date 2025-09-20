@@ -26,13 +26,15 @@ export class GameLoop {
       this.game.animationSystem?.updateAnimations(deltaSeconds);
       this.game.effectsRenderer?.updateEffects(deltaSeconds);
       this.game.particleSystem?.update(deltaSeconds);
-      this.game.lightingSystem?.updateLighting();
+
       this.game.worldRenderer?.render();
       this.game.effectsRenderer?.render();
       const ctx = this.game.spriteRenderer?.ctx;
       if (ctx) {
         this.game.particleSystem?.render(ctx);
       }
+
+      this.game.lightingSystem?.updateLighting();
       this.game.lightingSystem?.applyLighting();
       this.game.ui?.render();
       this.lastTime = currentTime;
