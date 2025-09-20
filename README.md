@@ -8,6 +8,13 @@ A fresh prototype of a top-down Britannia adventure. This build focuses on a sin
 - Explore with **WASD** or the arrow keys. Hold **Shift + arrows** to peek.
 - Tap **C** / **I** / **J** to focus the character sheet, inventory, or journal panels.
 
+## Art assets
+- Binary sprite sheets are intentionally omitted from version control.
+- Provide your own 32×32 pixel art in an `assets/` folder with the following filenames:
+  - `characters.png`, `monsters.png`, `items.png`
+  - `tiles.png`, `effects.png`, `ui.png`
+- The renderer will log a warning if an expected sheet is missing so gameplay can continue without bundling large binaries.
+
 ## Systems in this slice
 - **Character creator:** roll or tune STR/DEX/INT/VIT/LUK (10‑18) and begin with bespoke stats.
 - **Derived combat stats:** HP = VIT×10, MP = INT×5, Attack = STR + weapon, Defense = VIT + armor.

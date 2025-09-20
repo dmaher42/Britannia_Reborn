@@ -6,8 +6,6 @@ import { PartyUI } from './PartyUI.js';
 import { RealTimeCombat } from './RealTimeCombat.js';
 import { Enemy } from './Enemy.js';
 import { GameMap } from './GameMap.js';
-import { MapRenderer } from './MapRenderer.js';
-import { ObjectRenderer } from './ObjectRenderer.js';
 import { InteractionSystem } from './InteractionSystem.js';
 import { InputController } from './controls.js';
 import { MessageDisplay } from './MessageDisplay.js';
@@ -18,6 +16,14 @@ import { SpellSystem } from './SpellSystem.js';
 import { SpellMixingUI } from './SpellMixingUI.js';
 import { DialogueEngine, NPC, NPC_DATA } from './DialogueEngine.js';
 import { MagicShop } from './MagicShop.js';
+import { SpriteRenderer } from './SpriteRenderer.js';
+import { WorldRenderer } from './WorldRenderer.js';
+import { AnimationSystem } from './AnimationSystem.js';
+import { EffectsRenderer } from './EffectsRenderer.js';
+import { LightingSystem } from './LightingSystem.js';
+import { ParticleSystem } from './ParticleSystem.js';
+import { ModernUI } from './ModernUI.js';
+import { GameLoop } from './GameLoop.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -35,8 +41,6 @@ const sharedWeightLabel = document.getElementById('sharedWeight');
 const inventoryPanel = document.querySelector('.inventory-panel');
 
 const map = new GameMap();
-const renderer = new MapRenderer();
-const objectRenderer = new ObjectRenderer();
 const messageDisplay = new MessageDisplay({
   logElement: messageLogElement,
   statusElement,
@@ -45,23 +49,39 @@ const messageDisplay = new MessageDisplay({
 const saveManager = new SaveManager();
 const reagentSystem = new ReagentSystem();
 
+const spriteRenderer = new SpriteRenderer(canvas, ctx);
+const animationSystem = new AnimationSystem(spriteRenderer);
+const worldRenderer = new WorldRenderer(spriteRenderer, map, {});
+worldRenderer.setAnimationSystem(animationSystem);
+const effectsRenderer = new EffectsRenderer(spriteRenderer, worldRenderer);
+const lightingSystem = new LightingSystem(canvas, worldRenderer);
+const particleSystem = new ParticleSystem(canvas);
+
+let modernUI = null;
+let gameState = null;
+let gameLoop = null;
+
 let mariahNPC = null;
 let gwennoNPC = null;
 let smithyNPC = null;
 const input = new InputController(window);
 
-const floatingEffects = [];
 const worldAdapter = {
   map,
   showMessage: (text) => messageDisplay.log(text),
   showFloatingDamage: (x, y, amount) => {
-    floatingEffects.push({
-      x,
-      y,
-      text: amount,
-      alpha: 1,
-      offset: 0,
-    });
+    effectsRenderer?.createFloatingText(x ?? 0, y ?? 0, amount, '#ffdf7f');
+  },
+  createEffect: (name, startX, startY, targetX, targetY) => {
+    effectsRenderer?.createEffect(name, startX, startY, targetX, targetY);
+  },
+  spawnParticles: (type, x, y) => {
+    if (type === 'blood') {
+      const screen = worldRenderer.worldToScreen(x, y, { align: 'center' });
+      if (screen) {
+        particleSystem?.createBloodSplatter(screen.x + worldRenderer.tileDisplaySize / 2, screen.y + worldRenderer.tileDisplaySize / 2);
+      }
+    }
   },
   canMoveTo: (x, y, radius = 0.3) => map.isWalkableCircle(x, y, radius),
 };
@@ -144,6 +164,8 @@ const spawn = map.currentArea?.spawn ?? { x: 2, y: 5 };
 party.members.forEach((member, index) => {
   member.setPosition(spawn.x + 0.5 - index * 0.6, spawn.y + 0.5 + index * 0.4);
 });
+worldRenderer.setParty(party);
+worldRenderer.setCameraTargetResolver(() => party?.leader ?? party?.members?.[0] ?? null);
 let partyInventory = new PartyInventory(party);
 let partyMovement = new PartyMovement(party, map, { followSpacing: 0.9, speed: 3.6 });
 let combat = new RealTimeCombat(party, [], worldAdapter, {
@@ -156,6 +178,7 @@ let combat = new RealTimeCombat(party, [], worldAdapter, {
     spellMixingUI?.refreshReagents();
   },
 });
+worldRenderer.setCombat(combat);
 let partyUI = null;
 let interactionSystem = null;
 let selectedMember = party.leader;
@@ -164,6 +187,24 @@ let spellMixingUI = null;
 let dialogueEngine = null;
 let magicShop = null;
 let lastTransitionKey = null;
+
+function refreshModernUI() {
+  if (!modernUI) {
+    modernUI = new ModernUI(canvas, spriteRenderer, party, {
+      map,
+      inventory: partyInventory,
+      messageDisplay,
+    });
+  } else {
+    modernUI.party = party;
+    modernUI.setInventoryManager(partyInventory);
+  }
+  if (gameState) {
+    gameState.ui = modernUI;
+  }
+}
+
+refreshModernUI();
 
 const isSpellMixingOpen = () => Boolean(spellMixingUI?.isOpen?.() ?? spellMixingUI?.isVisible);
 const isConversationActive = () => Boolean(dialogueEngine?.conversationActive);
@@ -377,7 +418,7 @@ function rebuildInteractionSystem() {
     inventory: partyInventory,
     character: selectedMember,
     messageDisplay,
-    objectRenderer,
+    objectRenderer: worldRenderer,
     onInventoryChange: () => {
       partyUI?.renderInventory();
       updateWeightLabels();
@@ -399,6 +440,7 @@ function resizeCanvas() {
   canvas.width = Math.max(1, Math.round(rect.width * deviceRatio));
   canvas.height = Math.max(1, Math.round(rect.height * deviceRatio));
   ctx.setTransform(deviceRatio, 0, 0, deviceRatio, 0, 0);
+  lightingSystem?.setupLightCanvas();
 }
 
 window.addEventListener('resize', resizeCanvas);
@@ -503,15 +545,34 @@ function restoreCombatEnemies(options = {}) {
   return living;
 }
 
-function updateFloatingEffects(dt) {
-  for (let i = floatingEffects.length - 1; i >= 0; i -= 1) {
-    const effect = floatingEffects[i];
-    effect.alpha -= dt * 1.5;
-    effect.offset += dt * 18;
-    if (effect.alpha <= 0) {
-      floatingEffects.splice(i, 1);
-    }
+function applyAreaLighting(areaId) {
+  if (!lightingSystem) return;
+  switch (areaId) {
+    case 'cave':
+      lightingSystem.ambientLight = 0.18;
+      lightingSystem.addLightSource(10.5, 12.5, 2.8, 0.45, '#ff8844');
+      break;
+    case 'starter-room':
+      lightingSystem.ambientLight = 0.32;
+      lightingSystem.addLightSource(5.5, 5.5, 2.2, 0.4, '#ffcc88');
+      break;
+    default:
+      lightingSystem.ambientLight = 0.48;
+      lightingSystem.addLightSource(12.5, 8.5, 3.2, 0.3, '#a0c4ff');
+      break;
   }
+}
+
+function updateDynamicLights() {
+  if (!lightingSystem) return;
+  lightingSystem.clearLights();
+  applyAreaLighting(map.currentAreaId);
+  party?.members?.forEach((member, index) => {
+    if (!member) return;
+    const intensity = index === 0 ? 0.85 : 0.5;
+    lightingSystem.addTorchLight(member.x ?? 0, member.y ?? 0);
+    lightingSystem.lightSources[lightingSystem.lightSources.length - 1].intensity = intensity;
+  });
 }
 
 function update(dt) {
@@ -526,22 +587,7 @@ function update(dt) {
   checkAreaTransition();
   checkCombatTriggers();
   updateWorldInfo();
-  updateFloatingEffects(dt);
-}
-
-function render() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  renderer.draw(ctx, map, party, combat.enemies, { effects: floatingEffects });
-  objectRenderer.draw(ctx, map, map.getObjects());
-}
-
-let lastTime = performance.now();
-function frame(time) {
-  const dt = Math.min((time - lastTime) / 1000, 0.25);
-  lastTime = time;
-  update(dt);
-  render();
-  requestAnimationFrame(frame);
+  updateDynamicLights();
 }
 
 function saveGame() {
@@ -582,6 +628,9 @@ function loadGame() {
       spellMixingUI?.refreshReagents();
     },
   });
+  worldRenderer.setParty(party);
+  worldRenderer.setCombat(combat);
+  refreshModernUI();
   spellSystem.party = party;
   spellSystem.setInventory(partyInventory);
   spellSystem.setCombat(combat);
@@ -608,12 +657,12 @@ function loadGame() {
   restoreCombatEnemies({ startCombat: true });
   leaderProxy.position.x = selectedMember?.x ?? 0;
   leaderProxy.position.y = selectedMember?.y ?? 0;
-  floatingEffects.length = 0;
   map.updateTileInfo(leaderProxy.position.x, leaderProxy.position.y);
   initializeUI();
   rebuildInteractionSystem();
   updateWeightLabels();
   updateWorldInfo();
+  updateDynamicLights();
   messageDisplay.log('Your past deeds return to mind.');
 }
 
@@ -643,6 +692,7 @@ window.addEventListener('keydown', (event) => {
   } else if (event.key === 'I' || event.key === 'i') {
     event.preventDefault();
     inventoryPanel?.classList.toggle('collapsed');
+    modernUI?.toggleInventory();
   } else if (event.key === 'M' || event.key === 'm') {
     event.preventDefault();
     if (isSpellMixingOpen()) {
@@ -664,6 +714,23 @@ initializeUI();
 rebuildInteractionSystem();
 messageDisplay.log('You awaken in a small chamber within Britannia.');
 updateWorldInfo();
-requestAnimationFrame(frame);
+
+gameState = {
+  update,
+  worldRenderer,
+  animationSystem,
+  effectsRenderer,
+  particleSystem,
+  lightingSystem,
+  spriteRenderer,
+  ui: modernUI,
+  canvas,
+};
+
+gameLoop = new GameLoop(gameState);
+spriteRenderer.whenReady().then(() => {
+  updateDynamicLights();
+  gameLoop.start();
+});
 
 window.addEventListener('beforeunload', () => input.destroy());

@@ -163,8 +163,16 @@ export class InteractionSystem {
     const scaleY = this.canvas.height / rect.height;
     const tileWidth = this.canvas.width / this.map.currentWidth;
     const tileHeight = this.canvas.height / this.map.currentHeight;
-    const tileX = Math.floor((x * scaleX) / tileWidth);
-    const tileY = Math.floor((y * scaleY) / tileHeight);
+    const canvasX = x * scaleX;
+    const canvasY = y * scaleY;
+    if (this.objectRenderer?.screenToTile) {
+      const tile = this.objectRenderer.screenToTile(canvasX, canvasY);
+      if (tile && tile.x >= 0 && tile.y >= 0) {
+        return { x: tile.x, y: tile.y };
+      }
+    }
+    const tileX = Math.floor(canvasX / tileWidth);
+    const tileY = Math.floor(canvasY / tileHeight);
     if (tileX < 0 || tileY < 0 || tileX >= this.map.currentWidth || tileY >= this.map.currentHeight) {
       return null;
     }
