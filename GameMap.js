@@ -1,6 +1,16 @@
 import { WorldObject } from './WorldObject.js';
 
-const WALKABLE_TILES = new Set(['grass', 'cave_floor', 'cave_entrance', 'path', 'floor', 'gate']);
+const WALKABLE_TILES = new Set([
+  'grass',
+  'cave_floor',
+  'cave_entrance',
+  'path',
+  'floor',
+  'stone_floor',
+  'wood_floor',
+  'carpet',
+  'gate',
+]);
 
 const createGrid = (rows) => rows.map((row) => row.split(' '));
 
@@ -12,37 +22,55 @@ const parseAsciiMap = (rows, mapping) =>
       .join(' ')
   );
 
-const STARTER_ROOM_LAYOUT = [
-  '##########',
-  '#........#',
-  '#..A.....#',
-  '#........#',
-  '#........#',
-  'D..G.L..S#',
-  '#........#',
-  '#........#',
-  '#.......C#',
-  '##########',
+const CASTLE_LAYOUT = [
+  '##############################',
+  '#..wwwwwwwww======wwwwwwwww..#',
+  '#..wwww+wwww======wwww+wwww..#',
+  '#..wwww+wwwwwwwwwwwwww+wwww..#',
+  '#.........+..====..+.........#',
+  '#.........+..====..+.........#',
+  '#.........+..====..+.........#',
+  '#.......#####====#####.......#',
+  '#.ww##ww#....====....#ww##ww.#',
+  '#.ww##ww#....====....#ww##ww.#',
+  '#.ww##ww.....====.....ww##ww.#',
+  '#.ww##ww.....====.....ww##ww.#',
+  '#.wwwwww.....====.....wwwwww.#',
+  '#.wwwwww.....====.....wwwwww.#',
+  '#.wwwwww..ww.====.ww..wwwwww.#',
+  '#.wwwwww..ww.====.ww..wwwwww.#',
+  '#..wwwwww#tww====wwt#wwwwww..#',
+  '#..wwwwww#too====oot#wwwwww..#',
+  '#..wwwwww#too====oot#wwwwww..#',
+  '#..wwwwww#tww====wwt#wwwwww..#',
+  '#.......#####====#####.......#',
+  '#............====............#',
+  '#............====............#',
+  '#............====............#',
+  '#............====............#',
+  '#............====............#',
+  '#............GGGG............#',
+  '##############################',
 ];
 
-const STARTER_ROOM_MAP = parseAsciiMap(STARTER_ROOM_LAYOUT, {
-  '#': 'wall',
-  '.': 'floor',
-  'D': 'floor',
-  'L': 'floor',
-  'A': 'floor',
-  'C': 'floor',
+const STARTER_ROOM_MAP = parseAsciiMap(CASTLE_LAYOUT, {
+  '#': 'stone_wall',
+  '.': 'stone_floor',
+  'w': 'wood_floor',
+  '=': 'carpet',
+  '+': 'stone_wall',
+  't': 'tree',
+  'o': 'water',
   'G': 'gate',
-  'S': 'floor',
 });
 
 const AREA_LIBRARY = {
   'starter-room': {
     id: 'starter-room',
-    name: 'Starter Chamber',
+    name: 'Castle Britannia',
     level: 1,
     safe: true,
-    spawn: { x: 2, y: 5 },
+    spawn: { x: 14, y: 24 },
     tiles: createGrid(STARTER_ROOM_MAP),
     transitions: [{ tile: 'gate', to: 'forest', spawn: { x: 10, y: 10 } }],
   },
@@ -76,7 +104,7 @@ const AREA_LIBRARY = {
     ]),
     transitions: [
       { tile: 'cave_entrance', to: 'cave', spawn: { x: 10, y: 17 } },
-      { tile: 'gate', to: 'starter-room', spawn: { x: 3, y: 5 } },
+      { tile: 'gate', to: 'starter-room', spawn: { x: 14, y: 24 } },
     ],
   },
   cave: {
@@ -115,7 +143,11 @@ const AREA_LIBRARY = {
 
 const tileName = {
   floor: 'Stone Floor',
+  stone_floor: 'Flagstone Floor',
+  wood_floor: 'Polished Wood Floor',
+  carpet: 'Ornate Carpet',
   wall: 'Stone Wall',
+  stone_wall: 'Castle Wall',
   grass: 'Grass',
   tree: 'Trees',
   water: 'Water',
