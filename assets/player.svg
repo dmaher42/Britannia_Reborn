@@ -1,0 +1,12 @@
+<svg width="32" height="32" xmlns="http://www.w3.org/2000/svg">
+  <!-- Head -->
+  <circle cx="16" cy="10" r="6" fill="#FFE4B5"/>
+  <!-- Body -->
+  <rect x="12" y="16" width="8" height="12" fill="#4682B4"/>
+  <!-- Arms -->
+  <rect x="8" y="18" width="4" height="6" fill="#FFE4B5"/>
+  <rect x="20" y="18" width="4" height="6" fill="#FFE4B5"/>
+  <!-- Legs -->
+  <rect x="13" y="26" width="3" height="6" fill="#8B4513"/>
+  <rect x="16" y="26" width="3" height="6" fill="#8B4513"/>
+</svg>

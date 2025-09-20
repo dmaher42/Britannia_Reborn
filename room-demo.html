@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Room Demo - Player Sprite Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #2c3e50;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            border: 2px solid #34495e;
+            display: block;
+            margin: 0 auto;
+        }
+        .info {
+            text-align: center;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="info">
+        <h1>Room Demo - Player Sprite Test</h1>
+        <p>Use WASD or arrow keys to move. Press N to switch rooms.</p>
+    </div>
+    <canvas id="game" width="640" height="360"></canvas>
+    <div class="info">
+        <p>Player sprite loaded from: <code>/assets/player.png</code></p>
+    </div>
+
+    <script>
+        // Copy the content from room-levels-script.html
+        // ==================== ROOM DEFINITIONS ====================
+        const rooms = {
+            room1: {
+                spawn: { x: 112, y: 112 },
+                obstacles: [
+                    { x: 0, y: 0, w: 640, h: 24, type: 'wall' },
+                    { x: 0, y: 336, w: 640, h: 24, type: 'wall' },
+                    { x: 0, y: 24, w: 24, h: 312, type: 'wall' },
+                    { x: 616, y: 24, w: 24, h: 312, type: 'wall' },
+                    { x: 180, y: 160, w: 120, h: 96, type: 'tree' },
+                    { x: 360, y: 80, w: 160, h: 32, type: 'wall' }
+                ],
+                props: [
+                    { x: 120, y: 240, w: 44, h: 44, type: 'crate' },
+                    { x: 420, y: 140, w: 60, h: 60, type: 'tent', spriteURL: '/assets/tent.png' }
+                ]
+            },
+            room2: {
+                spawn: { x: 320, y: 260 },
+                obstacles: [
+                    { x: 0, y: 0, w: 640, h: 24, type: 'wall' },
+                    { x: 0, y: 336, w: 640, h: 24, type: 'wall' },
+                    { x: 0, y: 24, w: 24, h: 312, type: 'wall' },
+                    { x: 616, y: 24, w: 24, h: 312, type: 'wall' },
+                    { x: 140, y: 120, w: 100, h: 100, type: 'rock' },
+                    { x: 360, y: 128, w: 160, h: 36, type: 'tree' },
+                    { x: 300, y: 280, w: 200, h: 24, type: 'wall' }
+                ],
+                props: [
+                    { x: 80, y: 260, w: 48, h: 48, type: 'campfire' },
+                    { x: 500, y: 90, w: 56, h: 56, type: 'shrine', spriteURL: '/assets/tree.png' }
+                ]
+            }
+        };
+
+        const roomOrder = Object.keys(rooms);
+        if (roomOrder.length === 0) {
+            throw new Error('No rooms have been defined. Add at least one to the "rooms" object.');
+        }
+
+        let currentRoomIndex = 0;
+        let currentRoom = null;
+
+        // ==================== CANVAS & PLAYER SETUP ====================
+        const canvas = document.getElementById('game');
+        if (!canvas) {
+            throw new Error('Expected a <canvas id="game"> element in the document.');
+        }
+        if (!canvas.width) canvas.width = 640;
+        if (!canvas.height) canvas.height = 360;
+
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+
+        const player = {
+            x: 0,
+            y: 0,
+            width: 32,
+            height: 32,
+            speed: 160
+        };
+
+        const movementKeys = new Set(['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd']);
+        const heldKeys = Object.create(null);
+
+        // Active state for the currently loaded room.
+        const activeObstacles = [];
+        const activeProps = [];
+
+        // ==================== RENDERING HELPERS ====================
+        const obstacleColors = {
+            wall: '#7b7f83',
+            tree: '#3f8f3f',
+            rock: '#6a5745',
+            water: '#3d6fa4'
+        };
+        const placeholderPropFill = '#d8ceb4';
+        const placeholderPropStroke = '#6b5d43';
+
+        // ==================== PLAYER SPRITE LOADING ====================
+        const playerImage = new Image();
+        playerImage.src = '/assets/player.png';
+        let playerSpriteReady = false;
+        let loopStarted = false;
+
+        function handlePlayerSpriteReady() {
+            playerSpriteReady = playerImage.complete && playerImage.naturalWidth !== 0;
+            console.log('Player sprite ready:', playerSpriteReady);
+            if (playerSpriteReady) {
+                console.log('Player sprite dimensions:', playerImage.naturalWidth, 'x', playerImage.naturalHeight);
+            }
+            startGameLoop();
+        }
+
+        playerImage.addEventListener('load', handlePlayerSpriteReady);
+        playerImage.addEventListener('error', (e) => {
+            console.error('Failed to load player sprite:', e);
+            handlePlayerSpriteReady();
+        });
+        if (playerImage.complete && playerImage.naturalWidth !== 0) {
+            handlePlayerSpriteReady();
+        }
+
+        let lastTime = 0;
+
+        function startGameLoop() {
+            if (loopStarted) return;
+            loopStarted = true;
+            loadRoom(rooms[roomOrder[currentRoomIndex]]);
+            lastTime = performance.now();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // ==================== ROOM LOADER ====================
+        function loadRoom(roomData) {
+            if (!roomData) return;
+
+            currentRoom = roomData;
+
+            // Reset previous room state.
+            activeObstacles.length = 0;
+            activeProps.length = 0;
+
+            const spawn = roomData.spawn || { x: 0, y: 0 };
+            player.x = spawn.x;
+            player.y = spawn.y;
+
+            (roomData.obstacles || []).forEach((obstacle) => {
+                activeObstacles.push({ ...obstacle });
+            });
+
+            (roomData.props || []).forEach((propData) => {
+                const prop = {
+                    x: propData.x,
+                    y: propData.y,
+                    w: propData.w,
+                    h: propData.h,
+                    type: propData.type,
+                    spriteURL: propData.spriteURL || null,
+                    image: null,
+                    imageLoaded: false
+                };
+
+                if (prop.spriteURL) {
+                    const img = new Image();
+                    prop.image = img;
+                    img.addEventListener('load', () => {
+                        prop.imageLoaded = true;
+                    });
+                    img.addEventListener('error', () => {
+                        prop.image = null;
+                        prop.imageLoaded = false;
+                    });
+                    img.src = prop.spriteURL;
+                }
+
+                activeProps.push(prop);
+            });
+        }
+
+        // ==================== INPUT HANDLERS ====================
+        window.addEventListener('keydown', (event) => {
+            const key = event.key.toLowerCase();
+            heldKeys[key] = true;
+
+            if (key === 'n') {
+                currentRoomIndex = (currentRoomIndex + 1) % roomOrder.length;
+                loadRoom(rooms[roomOrder[currentRoomIndex]]);
+            }
+        });
+
+        window.addEventListener('keyup', (event) => {
+            const key = event.key.toLowerCase();
+            heldKeys[key] = false;
+        });
+
+        // ==================== GAME LOOP ====================
+        function gameLoop(currentTime) {
+            const deltaTime = (currentTime - lastTime) / 1000;
+            lastTime = currentTime;
+
+            update(deltaTime);
+            draw();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function update(deltaTime) {
+            handleMovement(deltaTime);
+        }
+
+        function handleMovement(deltaTime) {
+            let moveX = 0;
+            let moveY = 0;
+
+            if (heldKeys['w'] || heldKeys['arrowup']) moveY -= 1;
+            if (heldKeys['s'] || heldKeys['arrowdown']) moveY += 1;
+            if (heldKeys['a'] || heldKeys['arrowleft']) moveX -= 1;
+            if (heldKeys['d'] || heldKeys['arrowright']) moveX += 1;
+
+            if (moveX === 0 && moveY === 0) return;
+
+            const length = Math.sqrt(moveX * moveX + moveY * moveY);
+            moveX /= length;
+            moveY /= length;
+
+            const step = player.speed * deltaTime;
+            tryMove(step * moveX, step * moveY);
+        }
+
+        function tryMove(deltaX, deltaY) {
+            if (deltaX !== 0) {
+                const targetX = player.x + deltaX;
+                if (!collidesAt(targetX, player.y)) {
+                    player.x = targetX;
+                }
+            }
+
+            if (deltaY !== 0) {
+                const targetY = player.y + deltaY;
+                if (!collidesAt(player.x, targetY)) {
+                    player.y = targetY;
+                }
+            }
+        }
+
+        function collidesAt(x, y) {
+            const halfW = player.width / 2;
+            const halfH = player.height / 2;
+            const left = x - halfW;
+            const right = x + halfW;
+            const top = y - halfH;
+            const bottom = y + halfH;
+
+            return activeObstacles.some((obstacle) => {
+                const obstacleRight = obstacle.x + obstacle.w;
+                const obstacleBottom = obstacle.y + obstacle.h;
+                return (
+                    right > obstacle.x &&
+                    left < obstacleRight &&
+                    bottom > obstacle.y &&
+                    top < obstacleBottom
+                );
+            });
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = '#1c2533';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            drawObstacles();
+            drawProps();
+            drawPlayer();
+            drawOverlay();
+        }
+
+        function drawObstacles() {
+            activeObstacles.forEach((obstacle) => {
+                ctx.fillStyle = obstacleColors[obstacle.type] || '#8b6e44';
+                ctx.fillRect(obstacle.x, obstacle.y, obstacle.w, obstacle.h);
+            });
+        }
+
+        function drawProps() {
+            activeProps.forEach((prop) => {
+                if (prop.image && (prop.imageLoaded || (prop.image.complete && prop.image.naturalWidth))) {
+                    ctx.drawImage(prop.image, prop.x, prop.y, prop.w, prop.h);
+                } else {
+                    ctx.fillStyle = placeholderPropFill;
+                    ctx.fillRect(prop.x, prop.y, prop.w, prop.h);
+                    ctx.strokeStyle = placeholderPropStroke;
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(prop.x, prop.y, prop.w, prop.h);
+                    ctx.beginPath();
+                    ctx.moveTo(prop.x + 4, prop.y + 4);
+                    ctx.lineTo(prop.x + prop.w - 4, prop.y + prop.h - 4);
+                    ctx.moveTo(prop.x + prop.w - 4, prop.y + 4);
+                    ctx.lineTo(prop.x + 4, prop.y + prop.h - 4);
+                    ctx.stroke();
+                }
+            });
+        }
+
+        function drawPlayer() {
+            const drawX = player.x - player.width / 2;
+            const drawY = player.y - player.height / 2;
+
+            if (playerSpriteReady) {
+                // Draw the player sprite - for now just draw the whole image scaled down
+                // In a real implementation, you'd select the appropriate frame from the sprite sheet
+                ctx.drawImage(playerImage, drawX, drawY, player.width, player.height);
+            } else {
+                // Fallback: draw a simple colored rectangle
+                ctx.fillStyle = '#ffd35f';
+                ctx.fillRect(drawX, drawY, player.width, player.height);
+                ctx.strokeStyle = '#8c6b1f';
+                ctx.strokeRect(drawX, drawY, player.width, player.height);
+            }
+        }
+
+        function drawOverlay() {
+            ctx.save();
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+            ctx.fillRect(12, 12, 280, 72);
+            ctx.fillStyle = '#f2f5ff';
+            ctx.font = '14px sans-serif';
+            ctx.textBaseline = 'top';
+            ctx.fillText(`Room: ${roomOrder[currentRoomIndex]}`, 20, 20);
+            ctx.fillText('Press N to switch rooms', 20, 40);
+            ctx.fillText(`Player sprite: ${playerSpriteReady ? 'Loaded' : 'Loading...'}`, 20, 60);
+            ctx.restore();
+        }
+    </script>
+</body>
+</html>

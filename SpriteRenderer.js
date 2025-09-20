@@ -1,6 +1,6 @@
 import { PlaceholderGraphics } from './PlaceholderGraphics.js';
 
-const SPRITE_SHEETS = ['characters', 'monsters', 'items', 'tiles', 'effects', 'ui'];
+const SPRITE_SHEETS = ['characters', 'monsters', 'items', 'tiles', 'effects', 'ui', 'player'];
 
 export class SpriteRenderer {
   constructor(canvas, context, options = {}) {
