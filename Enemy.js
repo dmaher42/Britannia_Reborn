@@ -181,11 +181,13 @@ export class BasicEnemyAI {
     const target = this.findClosestPartyMember(enemy, party);
     if (!target) {
       enemy.target = null;
+      enemy.isMoving = false;
       return;
     }
     const distance = this.getDistance(enemy, target);
     if (distance <= 1.2) {
       enemy.target = target;
+      enemy.isMoving = false;
       return;
     }
     if (distance <= 5) {
@@ -193,6 +195,7 @@ export class BasicEnemyAI {
       enemy.target = distance <= 1.2 ? target : enemy.target;
     } else {
       enemy.target = null;
+      enemy.isMoving = false;
     }
   }
 
@@ -231,6 +234,10 @@ export class BasicEnemyAI {
     if (this.canMoveTo(gameWorld, nextX, nextY)) {
       enemy.x = nextX;
       enemy.y = nextY;
+      enemy.isMoving = true;
+      enemy.facing = this.resolveFacing(nx, ny, enemy.facing);
+    } else {
+      enemy.isMoving = false;
     }
   }
 
@@ -243,6 +250,18 @@ export class BasicEnemyAI {
       return gameWorld.isWalkableCircle(x, y, 0.3);
     }
     return true;
+  }
+
+  resolveFacing(dx, dy, fallback = 'south') {
+    const absX = Math.abs(dx);
+    const absY = Math.abs(dy);
+    if (absX < 0.05 && absY < 0.05) {
+      return fallback;
+    }
+    if (absX > absY) {
+      return dx > 0 ? 'east' : 'west';
+    }
+    return dy > 0 ? 'south' : 'north';
   }
 }
 

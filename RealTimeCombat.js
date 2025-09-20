@@ -120,6 +120,7 @@ export class RealTimeCombat {
     }
     if (actual <= 0) return 0;
     this.showFloatingDamage(target, actual);
+    this.triggerCombatEffects(attacker, target);
     this.showMessage(`${attacker.name} hits ${target.name} for ${actual} damage!`);
     return actual;
   }
@@ -184,6 +185,16 @@ export class RealTimeCombat {
     if (!target || amount <= 0) return;
     if (this.gameWorld?.showFloatingDamage) {
       this.gameWorld.showFloatingDamage(target.x ?? 0, target.y ?? 0, amount);
+    }
+  }
+
+  triggerCombatEffects(attacker, target) {
+    if (!target) return;
+    if (this.gameWorld?.createEffect) {
+      this.gameWorld.createEffect('sword_slash', target.x ?? 0, target.y ?? 0);
+    }
+    if (this.gameWorld?.spawnParticles) {
+      this.gameWorld.spawnParticles('blood', target.x ?? 0, target.y ?? 0);
     }
   }
 

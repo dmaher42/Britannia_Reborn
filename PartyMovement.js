@@ -37,6 +37,9 @@ export class PartyMovement {
     if (next) {
       leader.setPosition(next.x, next.y);
       leader.isMoving = Math.hypot(velocity.x ?? 0, velocity.y ?? 0) > 0;
+      if (leader.isMoving) {
+        leader.facing = this.resolveFacing(velocity.x ?? 0, velocity.y ?? 0, leader.facing);
+      }
     } else {
       leader.isMoving = false;
     }
@@ -97,6 +100,7 @@ export class PartyMovement {
     if (this.canOccupy(world, nextX, nextY)) {
       member.setPosition(nextX, nextY);
       member.isMoving = true;
+      member.facing = this.resolveFacing(nx, ny, member.facing);
     } else {
       member.isMoving = false;
     }
@@ -160,6 +164,18 @@ export class PartyMovement {
         member,
       };
     });
+  }
+
+  resolveFacing(dx, dy, fallback = 'south') {
+    const absX = Math.abs(dx);
+    const absY = Math.abs(dy);
+    if (absX < 0.05 && absY < 0.05) {
+      return fallback;
+    }
+    if (absX > absY) {
+      return dx > 0 ? 'east' : 'west';
+    }
+    return dy > 0 ? 'south' : 'north';
   }
 }
 

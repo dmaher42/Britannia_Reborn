@@ -377,9 +377,7 @@ export class SpellSystem {
 
   showExplosionEffect(x, y) {
     this.showMessage('A burst of flame erupts!');
-    if (this.world?.showFloatingDamage) {
-      this.world.showFloatingDamage(x ?? 0, y ?? 0, '✴');
-    }
+    this.world?.createEffect?.('fire_explosion', x ?? 0, y ?? 0);
   }
 
   findAdjacentTile(caster) {
@@ -425,6 +423,7 @@ export class SpellSystem {
     const before = recipient.health.current;
     recipient.health.current = clamp(recipient.health.current + healAmount, 0, recipient.health.max);
     const restored = recipient.health.current - before;
+    this.world?.createEffect?.('heal', recipient.x ?? caster?.x ?? 0, recipient.y ?? caster?.y ?? 0);
     this.showMessage(`${recipient.name} is healed for ${restored} points!`);
   }
 
@@ -432,6 +431,9 @@ export class SpellSystem {
     if (!target || !target.health) {
       this.showMessage('Select a target for Magic Missile!');
       return;
+    }
+    if (caster) {
+      this.world?.createEffect?.('magic_missile', caster.x ?? 0, caster.y ?? 0, target.x ?? caster.x ?? 0, target.y ?? caster.y ?? 0);
     }
     const damage = Math.max(1, 3 + Math.floor((caster?.int ?? 0) / 4));
     const dealt = target.takeDamage ? target.takeDamage(damage) : Math.min(damage, target.health.current);
@@ -477,6 +479,7 @@ export class SpellSystem {
       targetX = caster?.target?.x ?? caster?.x ?? 0;
       targetY = caster?.target?.y ?? caster?.y ?? 0;
     }
+    this.world?.createEffect?.('fireball', caster?.x ?? 0, caster?.y ?? 0, targetX, targetY);
     const damage = 8 + Math.floor((caster?.int ?? 0) / 2);
     const enemies = this.getEnemiesInArea(targetX, targetY, 1);
     enemies.forEach((enemy) => {
