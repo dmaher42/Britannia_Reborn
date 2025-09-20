@@ -100,6 +100,56 @@ describe('LightingSystem', () => {
       }
     }
   });
+
+  it('handles non-finite values in renderLight gracefully', () => {
+    const originalDocument = globalThis.document;
+    const lightCtx = {
+      save: vi.fn(),
+      restore: vi.fn(),
+      fillRect: vi.fn(),
+      createRadialGradient: vi.fn(() => ({ addColorStop: vi.fn() })),
+      globalCompositeOperation: 'source-over',
+    };
+    const lightCanvas = { width: 0, height: 0, getContext: () => lightCtx };
+    globalThis.document = { createElement: () => lightCanvas };
+
+    const canvas = { width: 200, height: 200, getContext: () => lightCtx };
+    const worldRenderer = { worldToScreen: vi.fn(), tileDisplaySize: 64 };
+    const lighting = new LightingSystem(canvas, worldRenderer);
+
+    try {
+      const light = { worldX: 0, worldY: 0, radius: 2, color: '#ffffff' };
+
+      // Test with NaN values in screen coordinates
+      worldRenderer.worldToScreen.mockReturnValue({ x: NaN, y: 10 });
+      lighting.renderLight(light);
+      expect(lightCtx.createRadialGradient).not.toHaveBeenCalled();
+
+      // Test with valid coordinates - should call createRadialGradient
+      worldRenderer.worldToScreen.mockReturnValue({ x: 10, y: 10 });
+      lighting.renderLight(light);
+      expect(lightCtx.createRadialGradient).toHaveBeenCalledWith(42, 42, 0, 42, 42, 128);
+
+      // Test with zero radius - should not call createRadialGradient
+      lightCtx.createRadialGradient.mockClear();
+      const zeroRadiusLight = { ...light, radius: 0 };
+      lighting.renderLight(zeroRadiusLight);
+      expect(lightCtx.createRadialGradient).not.toHaveBeenCalled();
+
+      // Test with negative radius - should not call createRadialGradient
+      lightCtx.createRadialGradient.mockClear();
+      const negativeRadiusLight = { ...light, radius: -5 };
+      lighting.renderLight(negativeRadiusLight);
+      expect(lightCtx.createRadialGradient).not.toHaveBeenCalled();
+
+    } finally {
+      if (typeof originalDocument === 'undefined') {
+        delete globalThis.document;
+      } else {
+        globalThis.document = originalDocument;
+      }
+    }
+  });
 });
 
 describe('SpellSystem', () => {

@@ -95,6 +95,12 @@ export class LightingSystem {
     const radiusPixels = light.radiusIsPixels ? light.radius : light.radius * tileSize;
     const centerX = screen.x + tileSize / 2;
     const centerY = screen.y + tileSize / 2;
+    
+    // Validate all parameters are finite before creating the gradient
+    if (!Number.isFinite(centerX) || !Number.isFinite(centerY) || !Number.isFinite(radiusPixels) || radiusPixels <= 0) {
+      return;
+    }
+    
     const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radiusPixels);
     const intensity = Math.max(0, Math.min(1, light.intensity ?? 1));
     gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${intensity})`);
