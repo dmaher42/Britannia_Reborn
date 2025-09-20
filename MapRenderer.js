@@ -6,6 +6,7 @@ const TILE_COLORS = {
   cave_entrance: '#b19862',
   cave_floor: '#6a5b52',
   wall: '#1f1b24',
+  floor: '#6b6254',
   void: '#020409',
 };
 
