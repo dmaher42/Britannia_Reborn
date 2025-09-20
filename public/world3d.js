@@ -33,6 +33,109 @@ const currentCamera = { x: 0, y: 0 };
 const layers = { background: null, mid: null, near: null };
 let lightsGroup = null;
 
+const CAMERA_LAYERS = Object.freeze({ background: 0, mid: 1, near: 2 });
+const DEFAULT_VISIBLE_LAYERS = Object.keys(CAMERA_LAYERS);
+const activeLayerMask = new Set(DEFAULT_VISIBLE_LAYERS);
+const DEFAULT_CAMERA_NEAR = 0.1;
+const DEFAULT_CAMERA_FAR = 5000;
+
+function normaliseLayerName(layerName) {
+  return typeof layerName === 'string' ? layerName : '';
+}
+
+function isKnownLayer(layerName) {
+  return Object.prototype.hasOwnProperty.call(CAMERA_LAYERS, layerName);
+}
+
+function getLayerBit(layerName) {
+  const key = normaliseLayerName(layerName);
+  if (isKnownLayer(key)) {
+    return CAMERA_LAYERS[key];
+  }
+  return CAMERA_LAYERS.mid;
+}
+
+function assignObjectToLayer(object, layerName) {
+  if (!object) return;
+  const key = isKnownLayer(layerName) ? layerName : 'mid';
+  const bit = getLayerBit(key);
+  if (object.layers && typeof object.layers.set === 'function') {
+    object.layers.set(bit);
+  }
+  if (object.visible === false) {
+    object.visible = true;
+  }
+  if (typeof object.traverse === 'function') {
+    object.traverse((child) => {
+      if (child.layers && typeof child.layers.set === 'function') {
+        child.layers.set(bit);
+      }
+      if (child.visible === false) {
+        child.visible = true;
+      }
+    });
+  }
+}
+
+function updateGroupVisibility() {
+  Object.entries(layers).forEach(([name, group]) => {
+    if (!group) return;
+    group.visible = activeLayerMask.has(name);
+  });
+  if (lightsGroup) {
+    lightsGroup.visible = activeLayerMask.has('near');
+  }
+}
+
+function applyCameraLayerMask() {
+  if (!camera) return;
+  const bits = Array.from(activeLayerMask)
+    .map((name) => getLayerBit(name))
+    .filter((bit, index, array) => array.indexOf(bit) === index);
+  if (bits.length === 0) {
+    camera.layers.set(0);
+    return;
+  }
+  camera.layers.set(bits[0]);
+  for (let i = 1; i < bits.length; i += 1) {
+    camera.layers.enable(bits[i]);
+  }
+}
+
+function applyVisibleLayerSet(layerNames) {
+  activeLayerMask.clear();
+  const desired = Array.isArray(layerNames) && layerNames.length ? layerNames : DEFAULT_VISIBLE_LAYERS;
+  desired.forEach((name) => {
+    const key = normaliseLayerName(name);
+    if (isKnownLayer(key)) {
+      activeLayerMask.add(key);
+    }
+  });
+  if (activeLayerMask.size === 0) {
+    DEFAULT_VISIBLE_LAYERS.forEach((name) => activeLayerMask.add(name));
+  }
+  configRef.visibleLayers = Array.from(activeLayerMask);
+  updateGroupVisibility();
+  applyCameraLayerMask();
+}
+
+function assignGroupLayers() {
+  Object.entries(layers).forEach(([name, group]) => {
+    if (!group) return;
+    assignObjectToLayer(group, name);
+  });
+  if (lightsGroup) {
+    assignObjectToLayer(lightsGroup, 'near');
+  }
+}
+
+function sanitiseClippingValues(near, far) {
+  const resolvedNear = Number.isFinite(near) ? Math.max(0.01, near) : DEFAULT_CAMERA_NEAR;
+  const farCandidate = Number.isFinite(far) ? far : DEFAULT_CAMERA_FAR;
+  const resolvedFar = Math.max(resolvedNear + 1, farCandidate);
+  return { near: resolvedNear, far: resolvedFar };
+}
+
 const PARALLAX_FACTORS = {
   background: 0.2,
   mid: 0.5,
@@ -187,6 +290,8 @@ function loadSpritePlane(url, opts = {}) {
     z: opts.z || 0,
   };
 
+  assignObjectToLayer(mesh, mesh.userData.layer);
+
   const refresh = (image) => {
     const width = opts.width || image.width || 1;
     const height = opts.height || image.height || 1;
@@ -219,6 +324,7 @@ function createInstancedSpritePlane(url, count, opts = {}) {
     height: opts.height || (texture.image && texture.image.height) || 1,
   };
   instanced.userData.instances = new Array(count).fill(null);
+  assignObjectToLayer(instanced, opts.layer || 'mid');
 
   const matrix = new THREE.Matrix4();
   const quat = new THREE.Quaternion();
@@ -327,6 +433,8 @@ function ensureSceneGraph() {
   scene.add(layers.background);
   scene.add(layers.mid);
   scene.add(layers.near);
+  assignGroupLayers();
+  updateGroupVisibility();
 }
 
 function ensureCamera() {
@@ -337,9 +445,13 @@ function ensureCamera() {
 
   const halfWidth = width / 2;
   const halfHeight = height / 2;
-  camera = new THREE.OrthographicCamera(-halfWidth, halfWidth, halfHeight, -halfHeight, -500, 500);
+  const { near, far } = sanitiseClippingValues(configRef.cameraNear, configRef.cameraFar);
+  camera = new THREE.OrthographicCamera(-halfWidth, halfWidth, halfHeight, -halfHeight, near, far);
   camera.position.set(0, 0, 100);
   camera.lookAt(new THREE.Vector3(0, 0, 0));
+  configRef.cameraNear = near;
+  configRef.cameraFar = far;
+  applyCameraLayerMask();
 }
 
 function ensureComposer() {
@@ -525,6 +637,7 @@ function setLights(lights = []) {
     const z = (light.z ?? 0) + 12 + index * 0.01;
     mesh.position.set(light.x ?? 0, -(light.y ?? 0), z);
     mesh.name = `light:${index}`;
+    assignObjectToLayer(mesh, 'near');
     lightsGroup.add(mesh);
   });
 }
@@ -570,6 +683,18 @@ function setCamera(x = 0, y = 0) {
   setParallax(currentCamera);
 }
 
+function setCameraClipping(options = {}) {
+  if (!camera) return;
+  const targetNear = Number.isFinite(options.near) ? options.near : camera.near;
+  const targetFar = Number.isFinite(options.far) ? options.far : camera.far;
+  const { near, far } = sanitiseClippingValues(targetNear, targetFar);
+  camera.near = near;
+  camera.far = far;
+  camera.updateProjectionMatrix();
+  configRef.cameraNear = near;
+  configRef.cameraFar = far;
+}
+
 function addSprite(name, mesh, options = {}) {
   if (!mesh) return null;
   const layerName = options.layer || mesh.userData.layer || 'mid';
@@ -579,6 +704,7 @@ function addSprite(name, mesh, options = {}) {
   const worldZ = options.z ?? mesh.userData.world?.z ?? 0;
   mesh.userData.layer = layerName;
   mesh.userData.world = { x: worldX, y: worldY, z: worldZ };
+  assignObjectToLayer(mesh, layerName);
   updateSpriteWorldTransform(mesh);
   layer.add(mesh);
   meshRegistry.set(name, mesh);
@@ -604,6 +730,28 @@ function setParallaxEnabled(flag) {
   }
 }
 
+function setVisibleLayers(layerNames) {
+  applyVisibleLayerSet(layerNames);
+}
+
+function setLayerVisibility(layerName, visible = true) {
+  const key = normaliseLayerName(layerName);
+  if (!isKnownLayer(key)) {
+    console.warn(`[world3d] Unknown layer "${layerName}"`);
+    return;
+  }
+  const next = new Set(activeLayerMask);
+  if (visible) {
+    next.add(key);
+  } else {
+    next.delete(key);
+  }
+  if (next.size === 0) {
+    next.add('mid');
+  }
+  applyVisibleLayerSet(Array.from(next));
+}
+
 function initThreeWorld(canvas, config = {}) {
   if (!canvas) {
     throw new Error('initThreeWorld requires a canvas element');
@@ -616,6 +764,7 @@ function initThreeWorld(canvas, config = {}) {
   ensureCamera();
   ensureComposer();
   setPixelArtMode(Boolean(config.pixelArtMode));
+  applyVisibleLayerSet(config.visibleLayers);
 
   loadParallaxBackdrops();
   buildDemoInstancing();
@@ -631,7 +780,10 @@ function initThreeWorld(canvas, config = {}) {
   return {
     addSprite,
     setCamera,
+    setCameraClipping,
     setParallaxEnabled,
+    setLayerVisibility,
+    setVisibleLayers,
     loadSpritePlane,
     createInstancedSpritePlane,
     getScene: () => scene,
@@ -667,4 +819,12 @@ function setPixelArtMode(flag) {
   }
 }
 
-export { initThreeWorld, renderThreeWorld, setLights, setPixelArtMode };
+export {
+  initThreeWorld,
+  renderThreeWorld,
+  setLights,
+  setPixelArtMode,
+  setLayerVisibility,
+  setVisibleLayers,
+  setCameraClipping,
+};
