@@ -9,7 +9,7 @@ const MODE_STATUS = {
   look: 'Looking. Click a tile or hold Shift with arrows to inspect.',
   get: 'Ready to take. Click an item or container.',
   use: 'Using. Click something to operate it.',
-  talk: 'Talk mode. Click a person to speak (coming soon).',
+  talk: 'Talk mode. Click a person to speak.',
 };
 
 export class InteractionSystem {
@@ -24,6 +24,7 @@ export class InteractionSystem {
     onInventoryChange,
     onEnemyTarget,
     getSelectedMember,
+    dialogueEngine,
   }) {
     this.canvas = canvas;
     this.map = map;
@@ -35,6 +36,7 @@ export class InteractionSystem {
     this.onInventoryChange = typeof onInventoryChange === 'function' ? onInventoryChange : null;
     this.onEnemyTarget = typeof onEnemyTarget === 'function' ? onEnemyTarget : null;
     this.getSelectedMember = typeof getSelectedMember === 'function' ? getSelectedMember : null;
+    this.dialogueEngine = dialogueEngine ?? null;
     this.mode = null;
     this._onKeyDown = (event) => this.handleKeyDown(event);
     this._onKeyUp = (event) => this.handleKeyUp(event);
@@ -271,9 +273,13 @@ export class InteractionSystem {
   }
 
   talkTo(object) {
-    if (object.type === 'npc') {
-      const line = object.dialogue?.[0] ?? `${object.name} has nothing to say yet.`;
-      this.messageDisplay?.log(line);
+    if (object?.type === 'npc') {
+      if (this.dialogueEngine && object.canTalk !== false) {
+        this.dialogueEngine.startConversation(object);
+      } else {
+        const line = object.dialogue?.[0] ?? `${object.name} has nothing to say yet.`;
+        this.messageDisplay?.log(line);
+      }
     } else {
       this.messageDisplay?.log('No one responds.');
     }

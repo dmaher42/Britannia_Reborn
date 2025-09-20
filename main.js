@@ -13,6 +13,11 @@ import { InputController } from './controls.js';
 import { MessageDisplay } from './MessageDisplay.js';
 import { Item, Door, Container, Lever } from './WorldObject.js';
 import { SaveManager, buildSaveData } from './SaveManager.js';
+import { ReagentSystem } from './ReagentSystem.js';
+import { SpellSystem } from './SpellSystem.js';
+import { SpellMixingUI } from './SpellMixingUI.js';
+import { DialogueEngine, NPC, NPC_DATA } from './DialogueEngine.js';
+import { MagicShop } from './MagicShop.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -38,6 +43,11 @@ const messageDisplay = new MessageDisplay({
   modeElement,
 });
 const saveManager = new SaveManager();
+const reagentSystem = new ReagentSystem();
+
+let mariahNPC = null;
+let gwennoNPC = null;
+let smithyNPC = null;
 const input = new InputController(window);
 
 const floatingEffects = [];
@@ -91,7 +101,37 @@ function createStarterObjects() {
   return [door, secretDoor, lever, apple, chest];
 }
 
+function createTownObjects() {
+  const objects = [];
+  mariahNPC = new NPC('Mariah', 9, 9, NPC_DATA.mariah);
+  gwennoNPC = new NPC('Gwenno', 12, 8, NPC_DATA.gwenno);
+  smithyNPC = new NPC('Smithy', 6, 13, NPC_DATA.smithy);
+  objects.push(mariahNPC, gwennoNPC, smithyNPC);
+
+  const garlicPatch = reagentSystem.createReagent('garlic', 3, {
+    id: 'wild_garlic_patch',
+    x: 5,
+    y: 13,
+  });
+  const mossPatch = reagentSystem.createReagent('blood_moss', 2, {
+    id: 'wild_moss_patch',
+    x: 14,
+    y: 11,
+  });
+  objects.push(garlicPatch, mossPatch);
+
+  return objects;
+}
+
+function syncTownNPCs() {
+  mariahNPC = map.findObjectById('npc_mariah', 'forest') ?? mariahNPC;
+  gwennoNPC = map.findObjectById('npc_gwenno', 'forest') ?? gwennoNPC;
+  smithyNPC = map.findObjectById('npc_smithy', 'forest') ?? smithyNPC;
+}
+
 map.setObjects('starter-room', createStarterObjects());
+map.setObjects('forest', createTownObjects());
+syncTownNPCs();
 
 const starterPartyMembers = [
   new PartyMember('Avatar', 'Fighter', { str: 18, dex: 14, int: 12, health: { current: 42, max: 42 }, mana: { current: 12, max: 12 } }),
@@ -113,11 +153,86 @@ let combat = new RealTimeCombat(party, [], worldAdapter, {
   onInventoryChange: () => {
     partyUI?.renderInventory();
     updateWeightLabels();
+    spellMixingUI?.refreshReagents();
   },
 });
 let partyUI = null;
 let interactionSystem = null;
 let selectedMember = party.leader;
+let spellSystem = null;
+let spellMixingUI = null;
+let dialogueEngine = null;
+let magicShop = null;
+let lastTransitionKey = null;
+
+const isSpellMixingOpen = () => Boolean(spellMixingUI?.isOpen?.() ?? spellMixingUI?.isVisible);
+const isConversationActive = () => Boolean(dialogueEngine?.conversationActive);
+const isMagicShopOpen = () => Boolean(magicShop?.isOpen?.());
+
+const closeSpellMixing = () => {
+  if (isSpellMixingOpen() && spellMixingUI?.closeMixingInterface) {
+    spellMixingUI.closeMixingInterface();
+  }
+};
+
+const closeConversationOverlay = () => {
+  if (isConversationActive()) {
+    dialogueEngine.endConversation();
+  }
+};
+
+const closeMagicShopOverlay = () => {
+  if (isMagicShopOpen()) {
+    magicShop.close();
+  }
+};
+
+const closeOtherOverlays = (except = null) => {
+  if (except !== 'mixing') {
+    closeSpellMixing();
+  }
+  if (except !== 'conversation') {
+    closeConversationOverlay();
+  }
+  if (except !== 'shop') {
+    closeMagicShopOverlay();
+  }
+};
+
+spellSystem = new SpellSystem(party, reagentSystem, {
+  inventory: partyInventory,
+  world: worldAdapter,
+  map,
+  combat,
+  onAfterCast: () => {
+    partyUI?.updateCombatDisplay();
+    spellMixingUI?.refreshReagents();
+  },
+});
+
+spellMixingUI = new SpellMixingUI(spellSystem, party, {
+  getSelectedMember: () => selectedMember,
+  onOpen: () => closeOtherOverlays('mixing'),
+});
+spellSystem.setMixingInterface(spellMixingUI);
+
+dialogueEngine = new DialogueEngine(worldAdapter, {
+  onKeyword: handleDialogueKeyword,
+  onStart: () => closeOtherOverlays('conversation'),
+});
+
+magicShop = new MagicShop(gwennoNPC, party, {
+  reagentSystem,
+  inventory: partyInventory,
+  showMessage: (text) => messageDisplay.log(text),
+  onTransaction: () => {
+    partyUI?.renderInventory();
+    updateWeightLabels();
+    spellMixingUI?.refreshReagents();
+  },
+  onOpen: () => closeOtherOverlays('shop'),
+});
+magicShop.renderInventory();
 const leaderProxy = { position: { x: party.leader?.x ?? 0, y: party.leader?.y ?? 0 } };
 
 const combatTriggers = [
@@ -145,6 +260,38 @@ function updateWeightLabels() {
     const shared = partyInventory.backpackWeight();
     const capacity = party.getAvailableInventorySpace() + shared;
     sharedWeightLabel.textContent = `${shared.toFixed(1)} / ${capacity.toFixed(1)}`;
+  }
+}
+
+function offerHealerService() {
+  if (!mariahNPC) return;
+  const target = selectedMember ?? party.leader ?? null;
+  if (!target?.health) {
+    messageDisplay.log('Mariah cannot aid thee at the moment.');
+    return;
+  }
+  if (target.health.current >= target.health.max) {
+    messageDisplay.log('Mariah says, "Thou art already whole."');
+    return;
+  }
+  const cost = 5;
+  if (!party.spendGold(cost)) {
+    messageDisplay.log('Mariah says, "Thou hast not the gold I require."');
+    return;
+  }
+  target.health.current = target.health.max;
+  messageDisplay.log(`Mariah lays gentle hands upon ${target.name}, and their wounds vanish.`);
+  magicShop?.renderInventory();
+}
+
+function handleDialogueKeyword(keyword, npc) {
+  if (!npc) return;
+  const normalized = (keyword ?? '').toLowerCase();
+  if (gwennoNPC && npc.id === gwennoNPC.id && normalized === 'buy') {
+    magicShop?.open();
+  }
+  if (mariahNPC && npc.id === mariahNPC.id && (normalized === 'heal' || normalized === 'donation')) {
+    offerHealerService();
   }
 }
 
@@ -234,14 +381,16 @@ function rebuildInteractionSystem() {
     onInventoryChange: () => {
       partyUI?.renderInventory();
       updateWeightLabels();
+      spellMixingUI?.refreshReagents();
     },
     onEnemyTarget: (enemy) => {
       combat?.setPartyTarget(selectedMember, enemy);
       partyUI?.updateCombatDisplay();
     },
     getSelectedMember: () => selectedMember,
+    dialogueEngine,
   });
-  messageDisplay.setStatus('Moving freely. Use L/G/U/T to interact.');
+  messageDisplay.setStatus('Moving freely. Use L/G/U/T to interact, M to mix reagents.');
 }
 
 function resizeCanvas() {
@@ -298,6 +447,38 @@ function checkCombatTriggers() {
   });
 }
 
+function checkAreaTransition() {
+  const leader = party.leader;
+  if (!leader) return;
+  const tileX = Math.floor(leader.x);
+  const tileY = Math.floor(leader.y);
+  const transition = map.checkTransition(tileX, tileY);
+  if (!transition) {
+    lastTransitionKey = null;
+    return;
+  }
+  const key = `${map.currentAreaId}:${tileX},${tileY}`;
+  if (lastTransitionKey === key) return;
+  lastTransitionKey = key;
+  if (!transition.to) return;
+  const spawn = transition.spawn ?? { x: tileX, y: tileY };
+  if (!map.setArea(transition.to, spawn)) return;
+  const spawnX = (spawn.x ?? tileX) + 0.5;
+  const spawnY = (spawn.y ?? tileY) + 0.5;
+  party.members.forEach((member, index) => {
+    member.setPosition(spawnX - index * 0.6, spawnY + index * 0.4);
+  });
+  leaderProxy.position.x = party.leader?.x ?? spawnX;
+  leaderProxy.position.y = party.leader?.y ?? spawnY;
+  syncTownNPCs();
+  magicShop?.renderInventory();
+  restoreCombatEnemies({ startCombat: false });
+  updateWeightLabels();
+  updateWorldInfo();
+  interactionSystem?.clearMode?.();
+  messageDisplay.log(`You arrive at ${map.getAreaName()}.`);
+}
+
 function getCurrentAreaEnemies() {
   return map
     .getObjects()
@@ -342,6 +523,7 @@ function update(dt) {
     leaderProxy.position.y = leader.y;
     map.updateTileInfo(leader.x, leader.y);
   }
+  checkAreaTransition();
   checkCombatTriggers();
   updateWorldInfo();
   updateFloatingEffects(dt);
@@ -364,7 +546,9 @@ function frame(time) {
 
 function saveGame() {
   const triggerStates = combatTriggers.map((trigger) => trigger.triggered);
-  const success = saveManager.save(buildSaveData({ party, map, inventory: partyInventory, triggers: triggerStates }));
+  const success = saveManager.save(
+    buildSaveData({ party, map, inventory: partyInventory, triggers: triggerStates, magic: spellSystem?.toJSON?.() ?? null })
+  );
   messageDisplay.log(success ? 'You inscribe your progress into the ether.' : 'The ether refuses your plea.');
 }
 
@@ -395,8 +579,23 @@ function loadGame() {
     onInventoryChange: () => {
       partyUI?.renderInventory();
       updateWeightLabels();
+      spellMixingUI?.refreshReagents();
     },
   });
+  spellSystem.party = party;
+  spellSystem.setInventory(partyInventory);
+  spellSystem.setCombat(combat);
+  spellSystem.setMap(map);
+  spellSystem.setWorld(worldAdapter);
+  spellSystem.loadFrom(data.magic ?? {});
+  spellMixingUI?.refreshReagents();
+  syncTownNPCs();
+  if (magicShop) {
+    magicShop.npc = gwennoNPC;
+    magicShop.party = party;
+    magicShop.inventoryManager = partyInventory;
+    magicShop.renderInventory();
+  }
   if (Array.isArray(data.triggers)) {
     combatTriggers.forEach((trigger, index) => {
       trigger.triggered = Boolean(data.triggers[index]);
@@ -444,9 +643,20 @@ window.addEventListener('keydown', (event) => {
   } else if (event.key === 'I' || event.key === 'i') {
     event.preventDefault();
     inventoryPanel?.classList.toggle('collapsed');
+  } else if (event.key === 'M' || event.key === 'm') {
+    event.preventDefault();
+    if (isSpellMixingOpen()) {
+      closeSpellMixing();
+    } else {
+      closeOtherOverlays('mixing');
+      spellMixingUI?.openMixingInterface();
+    }
   } else if (event.key === 'C' || event.key === 'c') {
     event.preventDefault();
-    document.querySelector('.equipment-panel')?.classList.toggle('highlight');
+    const caster = selectedMember ?? party.leader ?? null;
+    if (!spellSystem.castPreparedSpell(caster)) {
+      messageDisplay.log('No spell is prepared. Mix reagents first.');
+    }
   }
 });
 

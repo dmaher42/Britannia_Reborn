@@ -1,6 +1,6 @@
 import { WorldObject } from './WorldObject.js';
 
-const WALKABLE_TILES = new Set(['grass', 'cave_floor', 'cave_entrance', 'path', 'floor']);
+const WALKABLE_TILES = new Set(['grass', 'cave_floor', 'cave_entrance', 'path', 'floor', 'gate']);
 
 const createGrid = (rows) => rows.map((row) => row.split(' '));
 
@@ -18,7 +18,7 @@ const STARTER_ROOM_LAYOUT = [
   '#..A.....#',
   '#........#',
   '#........#',
-  'D....L..S#',
+  'D..G.L..S#',
   '#........#',
   '#........#',
   '#.......C#',
@@ -32,6 +32,7 @@ const STARTER_ROOM_MAP = parseAsciiMap(STARTER_ROOM_LAYOUT, {
   'L': 'floor',
   'A': 'floor',
   'C': 'floor',
+  'G': 'gate',
   'S': 'floor',
 });
 
@@ -43,7 +44,7 @@ const AREA_LIBRARY = {
     safe: true,
     spawn: { x: 2, y: 5 },
     tiles: createGrid(STARTER_ROOM_MAP),
-    transitions: [],
+    transitions: [{ tile: 'gate', to: 'forest', spawn: { x: 10, y: 10 } }],
   },
   forest: {
     id: 'forest',
@@ -62,7 +63,7 @@ const AREA_LIBRARY = {
       'tree grass path grass grass tree tree grass grass path grass grass grass tree tree grass grass tree grass tree',
       'tree grass path grass grass tree water water water water water water water tree grass grass grass tree grass tree',
       'tree grass path grass grass grass grass grass grass grass grass grass grass grass grass grass grass tree grass tree',
-      'tree grass path path path path path grass grass grass grass grass grass grass grass cave_entrance tree grass tree',
+      'tree grass gate path path path path grass grass grass grass grass grass grass grass cave_entrance tree grass tree',
       'tree grass grass grass grass grass grass grass tree tree tree grass grass grass grass grass grass tree grass tree',
       'tree grass grass grass tree tree grass grass tree tree tree grass grass tree tree grass grass grass grass tree',
       'tree grass grass grass tree tree grass grass tree grass grass grass grass tree tree grass grass grass grass tree',
@@ -75,6 +76,7 @@ const AREA_LIBRARY = {
     ]),
     transitions: [
       { tile: 'cave_entrance', to: 'cave', spawn: { x: 10, y: 17 } },
+      { tile: 'gate', to: 'starter-room', spawn: { x: 3, y: 5 } },
     ],
   },
   cave: {
@@ -120,6 +122,7 @@ const tileName = {
   path: 'Trail',
   cave_entrance: 'Cave Entrance',
   cave_floor: 'Cavern Floor',
+  gate: 'City Gate',
 };
 
 export class GameMap {

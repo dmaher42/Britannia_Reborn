@@ -38,6 +38,8 @@ export class Party {
       : [];
     this.movementController = null;
     this.leaderIndex = 0;
+    this.gold = Number.isFinite(options.gold) ? Math.max(0, Math.round(options.gold)) : 50;
+    this.inventoryRef = null;
     if (Number.isFinite(options.leaderIndex)) {
       this.setLeader(options.leaderIndex);
     } else if (this.members.length > 0) {
@@ -55,6 +57,10 @@ export class Party {
 
   setMovementController(controller) {
     this.movementController = controller ?? null;
+  }
+
+  setInventoryRef(inventory) {
+    this.inventoryRef = inventory ?? null;
   }
 
   addMember(entry) {
@@ -112,6 +118,36 @@ export class Party {
     return this.formation;
   }
 
+  addGold(amount = 0) {
+    const value = Number.isFinite(amount) ? Math.round(amount) : 0;
+    if (value <= 0) return this.gold;
+    this.gold += value;
+    return this.gold;
+  }
+
+  spendGold(amount = 0) {
+    const cost = Number.isFinite(amount) ? Math.round(amount) : 0;
+    if (cost <= 0) return true;
+    if (this.gold < cost) return false;
+    this.gold -= cost;
+    return true;
+  }
+
+  addReagent(type, quantity = 1, options = {}) {
+    if (!this.inventoryRef || typeof this.inventoryRef.addReagent !== 'function') return false;
+    return this.inventoryRef.addReagent(type, quantity, options);
+  }
+
+  getReagentCount(type) {
+    if (!this.inventoryRef || typeof this.inventoryRef.getReagentCount !== 'function') return 0;
+    return this.inventoryRef.getReagentCount(type);
+  }
+
+  consumeReagent(type, quantity = 1) {
+    if (!this.inventoryRef || typeof this.inventoryRef.consumeReagent !== 'function') return false;
+    return this.inventoryRef.consumeReagent(type, quantity);
+  }
+
   moveParty(direction, dt = 0.016, gameWorld = null) {
     if (this.movementController && typeof this.movementController.moveParty === 'function') {
       this.movementController.moveParty(direction, dt, gameWorld);
@@ -164,6 +200,7 @@ export class Party {
       leaderIndex: this.leaderIndex,
       formation: this.formation,
       sharedInventory: this.sharedInventory.map((item) => (item?.toJSON ? item.toJSON() : item)),
+      gold: this.gold,
     };
   }
 
@@ -175,6 +212,7 @@ export class Party {
       leaderIndex: data.leaderIndex,
       formation: data.formation,
       sharedInventory: data.sharedInventory,
+      gold: data.gold,
     });
   }
 }
