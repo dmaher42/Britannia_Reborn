@@ -55,6 +55,11 @@ export class PlaceholderGraphics {
     });
 
     this.canvases.set('characters', canvas);
+    // Animation definitions sometimes reference a dedicated 'player' sheet.
+    // Alias the generated character atlas so those lookups resolve cleanly.
+    if (!this.canvases.has('player')) {
+      this.canvases.set('player', canvas);
+    }
   }
 
   createMonsterSheet() {
