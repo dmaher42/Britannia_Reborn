@@ -1,4 +1,15 @@
-const FLOOR_TILES = new Set(['grass', 'path', 'water', 'sand', 'floor', 'stone_floor', 'wood_floor', 'cave_floor', 'gate']);
+const FLOOR_TILES = new Set([
+  'grass',
+  'path',
+  'water',
+  'sand',
+  'floor',
+  'stone_floor',
+  'wood_floor',
+  'carpet',
+  'cave_floor',
+  'gate',
+]);
 const WALL_TILES = new Set(['wall', 'stone_wall', 'wood_wall', 'cave_wall', 'tree']);
 const OVERLAY_TILES = new Set(['gate', 'cave_entrance']);
 
@@ -9,6 +20,7 @@ const TILE_MAPPINGS = {
   sand: { sheet: 'tiles', x: 96, y: 0 },
   stone_floor: { sheet: 'tiles', x: 0, y: 32 },
   wood_floor: { sheet: 'tiles', x: 32, y: 32 },
+  carpet: { sheet: 'tiles', x: 32, y: 32 },
   cave_floor: { sheet: 'tiles', x: 64, y: 32 },
   gate: { sheet: 'tiles', x: 96, y: 32 },
   floor: { sheet: 'tiles', x: 0, y: 32 },
@@ -189,6 +201,9 @@ export class WorldRenderer {
       const tile = this.gameWorld.tileAt(tileX, tileY);
       const definition = this.resolveFloorTile(tile);
       this.drawTile(definition, tileX, tileY);
+      if (tile === 'carpet') {
+        this.drawCarpetOverlay(tileX, tileY);
+      }
       if (tile === 'water') {
         this.drawAnimatedTile('water', tileX, tileY);
       }
@@ -289,6 +304,27 @@ export class WorldRenderer {
       definition.height ?? 32,
       { scale: this.spriteRenderer.scale },
     );
+  }
+
+  drawCarpetOverlay(tileX, tileY) {
+    const ctx = this.spriteRenderer?.ctx;
+    if (!ctx) return;
+    const screen = this.worldToScreen(tileX, tileY, { align: 'top-left' });
+    if (!screen) return;
+    const size = this.tileDisplaySize;
+    const border = Math.max(1, Math.round(size * 0.1));
+    ctx.save();
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = '#7c0a02';
+    ctx.fillRect(screen.x, screen.y, size, size);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#d4af37';
+    ctx.fillRect(screen.x, screen.y, size, border);
+    ctx.fillRect(screen.x, screen.y + size - border, size, border);
+    ctx.fillStyle = 'rgba(255, 220, 200, 0.18)';
+    const highlightHeight = Math.max(1, Math.floor(border / 2));
+    ctx.fillRect(screen.x + border, screen.y + border, size - border * 2, highlightHeight);
+    ctx.restore();
   }
 
   drawAnimatedTile(tileKey, tileX, tileY) {
