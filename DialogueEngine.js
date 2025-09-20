@@ -88,6 +88,59 @@ export class NPC extends WorldObject {
       defaultResponses: [...this.defaultResponses],
     };
   }
+
+  static fromJSON(data = {}) {
+    if (!data || typeof data !== 'object') {
+      throw new TypeError('Invalid NPC data.');
+    }
+
+    const cloneValue = (value) => {
+      if (Array.isArray(value)) {
+        return value.map((entry) => cloneValue(entry));
+      }
+      if (value && typeof value === 'object') {
+        return Object.fromEntries(
+          Object.entries(value).map(([key, entry]) => [key, cloneValue(entry)])
+        );
+      }
+      return value;
+    };
+
+    const npc = new NPC(data.name ?? data.id ?? 'NPC', data.x ?? 0, data.y ?? 0, {
+      id: data.id,
+      description: data.description,
+      profession: data.profession,
+      schedule: cloneValue(data.schedule),
+      canTalk: data.canTalk,
+      dialogues: cloneValue(data.dialogues ?? {}),
+      defaultResponses: Array.isArray(data.defaultResponses)
+        ? [...data.defaultResponses]
+        : cloneValue(data.defaultResponses),
+    });
+
+    npc.type = data.type ?? npc.type;
+    npc.flags = cloneValue(data.flags ?? {});
+    npc.contains = Array.isArray(data.contains)
+      ? data.contains.map((entry) =>
+          entry instanceof WorldObject ? entry : WorldObject.fromJSON(entry)
+        )
+      : [];
+
+    if (Number.isFinite(data.weight)) {
+      npc.weight = Number(data.weight);
+    }
+    if (typeof data.canGet === 'boolean') {
+      npc.canGet = data.canGet;
+    }
+    if (typeof data.canUse === 'boolean') {
+      npc.canUse = data.canUse;
+    }
+    if (typeof data.isOpen === 'boolean') {
+      npc.isOpen = data.isOpen;
+    }
+
+    return npc;
+  }
 }
 
 registerWorldObjectType('npc', NPC);

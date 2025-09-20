@@ -3,6 +3,28 @@ const DEFAULT_DESCRIPTION = 'You see nothing special.';
 const asNumber = (value, fallback = 0) =>
   Number.isFinite(value) ? Number(value) : fallback;
 
+const cloneJSONLike = (value) => {
+  if (Array.isArray(value)) {
+    return value.map((entry) => cloneJSONLike(entry));
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, cloneJSONLike(entry)])
+    );
+  }
+  return value;
+};
+
+const rehydrateAdditionalFields = (target, source, skipKeys = []) => {
+  const reserved = new Set(['id', 'name', 'type', 'x', 'y', ...skipKeys]);
+  Object.keys(source).forEach((key) => {
+    if (reserved.has(key)) return;
+    const value = source[key];
+    if (value === undefined) return;
+    target[key] = cloneJSONLike(value);
+  });
+};
+
 export class WorldObject {
   constructor(id, name, type, x, y, options = {}) {
     if (!id) throw new Error('WorldObject requires an id.');
@@ -79,8 +101,34 @@ export class WorldObject {
       throw new TypeError('Invalid world object data.');
     }
     const { type } = data;
-    const Class = WORLD_OBJECT_REGISTRY[type] ?? WorldObject;
-    return new Class(data.id, data.name, data.x, data.y, data);
+    const Class = type ? WORLD_OBJECT_REGISTRY[type] : undefined;
+
+    if (Class && typeof Class.fromJSON === 'function') {
+      return Class.fromJSON(data);
+    }
+
+    const instance = Class
+      ? new Class(data.id, data.name, data.x, data.y, data)
+      : new WorldObject(data.id, data.name, data.type, data.x, data.y, data);
+
+    if (!(instance instanceof WorldObject)) {
+      return instance;
+    }
+
+    if (!Class) {
+      rehydrateAdditionalFields(instance, data, ['contains']);
+      instance.contains = Array.isArray(data.contains)
+        ? data.contains.map((entry) => {
+            if (entry instanceof WorldObject) return entry;
+            if (entry && typeof entry === 'object') {
+              return WorldObject.fromJSON(entry);
+            }
+            return entry;
+          })
+        : [];
+    }
+
+    return instance;
   }
 }
 
