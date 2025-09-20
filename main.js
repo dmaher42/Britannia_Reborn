@@ -16,6 +16,7 @@ import { SpellSystem } from './SpellSystem.js';
 import { SpellMixingUI } from './SpellMixingUI.js';
 import { DialogueEngine, NPC, NPC_DATA } from './DialogueEngine.js';
 import { MagicShop } from './MagicShop.js';
+import { PlaceholderGraphics } from './PlaceholderGraphics.js';
 import { SpriteRenderer } from './SpriteRenderer.js';
 import { WorldRenderer } from './WorldRenderer.js';
 import { AnimationSystem } from './AnimationSystem.js';
@@ -49,13 +50,30 @@ const messageDisplay = new MessageDisplay({
 const saveManager = new SaveManager();
 const reagentSystem = new ReagentSystem();
 
-const spriteRenderer = new SpriteRenderer(canvas, ctx);
+const placeholderGraphics = new PlaceholderGraphics();
+const spriteRenderer = new SpriteRenderer(canvas, ctx, { placeholderGraphics });
 const animationSystem = new AnimationSystem(spriteRenderer);
 const worldRenderer = new WorldRenderer(spriteRenderer, map, {});
 worldRenderer.setAnimationSystem(animationSystem);
 const effectsRenderer = new EffectsRenderer(spriteRenderer, worldRenderer);
 const lightingSystem = new LightingSystem(canvas, worldRenderer);
 const particleSystem = new ParticleSystem(canvas);
+
+function testGraphicsSystem() {
+  if (!spriteRenderer) return;
+  spriteRenderer.clear();
+  spriteRenderer.drawSprite('characters', 0, 0, 10, 10);
+  spriteRenderer.drawSprite('monsters', 0, 0, 50, 10);
+  spriteRenderer.drawSprite('items', 0, 0, 90, 10);
+  spriteRenderer.drawSprite('tiles', 0, 0, 130, 10);
+  spriteRenderer.drawSprite('effects', 0, 0, 170, 10);
+  spriteRenderer.drawSprite('ui', 0, 0, 210, 10);
+  spriteRenderer.testPlaceholders();
+}
+
+if (typeof window !== 'undefined') {
+  window.testGraphicsSystem = testGraphicsSystem;
+}
 
 let modernUI = null;
 let gameState = null;
