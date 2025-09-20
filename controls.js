@@ -1,11 +1,44 @@
-const KEY_BINDINGS = {
-  left: ['ArrowLeft', 'a', 'A'],
-  right: ['ArrowRight', 'd', 'D'],
-  up: ['ArrowUp', 'w', 'W'],
-  down: ['ArrowDown', 's', 'S']
+const KEYBOARD_EVENTS = ['keydown', 'keyup'];
+
+const KEY_MAP = new Map([
+  ['ArrowUp', 'arrowup'],
+  ['Up', 'arrowup'],
+  ['arrowup', 'arrowup'],
+  ['up', 'arrowup'],
+  ['ArrowDown', 'arrowdown'],
+  ['Down', 'arrowdown'],
+  ['arrowdown', 'arrowdown'],
+  ['down', 'arrowdown'],
+  ['ArrowLeft', 'arrowleft'],
+  ['Left', 'arrowleft'],
+  ['arrowleft', 'arrowleft'],
+  ['left', 'arrowleft'],
+  ['ArrowRight', 'arrowright'],
+  ['Right', 'arrowright'],
+  ['arrowright', 'arrowright'],
+  ['right', 'arrowright'],
+  [' ', 'space'],
+  ['Spacebar', 'space'],
+  ['Space', 'space'],
+  ['space', 'space'],
+]);
+
+const normalizeKey = (key) => {
+  if (typeof key !== 'string') return '';
+  const direct = KEY_MAP.get(key);
+  if (direct) return direct;
+  const lower = key.toLowerCase();
+  return KEY_MAP.get(lower) ?? lower;
 };
 
-const KEYBOARD_EVENTS = ['keydown', 'keyup'];
+const PREVENT_DEFAULT_KEYS = new Set(['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'space']);
+
+const KEY_BINDINGS = {
+  left: ['arrowleft', 'a'],
+  right: ['arrowright', 'd'],
+  up: ['arrowup', 'w'],
+  down: ['arrowdown', 's'],
+};
 
 export class InputController {
   constructor(target = window) {
@@ -18,13 +51,15 @@ export class InputController {
   _install() {
     KEYBOARD_EVENTS.forEach((type) => {
       const handler = (event) => {
+        const normalized = normalizeKey(event.key);
+        if (!normalized) return;
         if (event.type === 'keydown') {
-          this.keys.add(event.key);
-          if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(event.key)) {
+          this.keys.add(normalized);
+          if (PREVENT_DEFAULT_KEYS.has(normalized) && typeof event.preventDefault === 'function') {
             event.preventDefault();
           }
         } else if (event.type === 'keyup') {
-          this.keys.delete(event.key);
+          this.keys.delete(normalized);
         }
       };
       this._handlers.set(type, handler);
@@ -44,7 +79,7 @@ export class InputController {
   }
 
   isKeyDown(key) {
-    return this.keys.has(key);
+    return this.keys.has(normalizeKey(key));
   }
 
   getDirection() {
@@ -65,6 +100,6 @@ export class InputController {
   }
 
   _anyDown(keys) {
-    return keys.some((key) => this.keys.has(key));
+    return keys.some((key) => this.keys.has(normalizeKey(key)));
   }
 }
