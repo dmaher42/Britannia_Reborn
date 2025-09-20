@@ -1,4 +1,4 @@
-import { WorldObject } from './WorldObject.js';
+import { Item, WorldObject } from './WorldObject.js';
 
 const weightOf = (item) => {
   if (!item) return 0;
@@ -32,6 +32,19 @@ const cloneItem = (item) => {
   }
 };
 
+const getReagentType = (object) => object?.reagentType ?? object?.flags?.reagentType ?? object?.meta?.reagentType ?? null;
+
+const isReagentObject = (object, type = null) => {
+  if (!object || object.type !== 'reagent') return false;
+  if (!type) return true;
+  return getReagentType(object) === type;
+};
+
+const reagentQuantity = (object) => {
+  const quantity = Number.isFinite(object?.quantity) ? object.quantity : 1;
+  return Math.max(0, quantity);
+};
+
 export class PartyInventory {
   constructor(party, items = []) {
     this.party = party ?? null;
@@ -47,6 +60,9 @@ export class PartyInventory {
     }
     if (this.party) {
       this.party.sharedInventory = this.sharedItems;
+      if (typeof this.party.setInventoryRef === 'function') {
+        this.party.setInventoryRef(this);
+      }
     }
   }
 
@@ -54,6 +70,12 @@ export class PartyInventory {
     this.party = party;
     if (party && !this.activeMember) {
       this.activeMember = party.leader ?? party.members?.[0] ?? null;
+    }
+    if (party) {
+      party.sharedInventory = this.sharedItems;
+      if (typeof party.setInventoryRef === 'function') {
+        party.setInventoryRef(this);
+      }
     }
   }
 
@@ -93,6 +115,16 @@ export class PartyInventory {
   add(item) {
     const object = toWorldObject(item) ?? item;
     if (!object) return false;
+    if (object.type === 'reagent') {
+      const type = getReagentType(object);
+      const quantity = reagentQuantity(object);
+      const unitWeight = Number.isFinite(object.unitWeight)
+        ? object.unitWeight
+        : quantity > 0 && Number.isFinite(object.weight)
+        ? object.weight / quantity
+        : 0.1;
+      return this.addReagent(type, quantity, { object, unitWeight });
+    }
     if (!this.canAddItem(object)) return false;
     this.sharedItems.push(object);
     if (this.party) {
@@ -252,7 +284,139 @@ export class PartyInventory {
     });
     if (this.party) {
       this.party.sharedInventory = this.sharedItems;
+      if (typeof this.party.setInventoryRef === 'function') {
+        this.party.setInventoryRef(this);
+      }
     }
+  }
+
+  addReagent(type, quantity = 1, options = {}) {
+    if (!type) return false;
+    const amount = Number.isFinite(quantity) ? Math.max(1, Math.round(quantity)) : 0;
+    if (amount <= 0) return false;
+    const unitWeight = Number.isFinite(options.unitWeight) ? Math.max(0, options.unitWeight) : 0.1;
+    const capacity = this.calculatePartyCapacity();
+    const projected = this.getCurrentWeight() + unitWeight * amount;
+    if (projected > capacity) {
+      return false;
+    }
+    const existing = this.sharedItems.find((item) => isReagentObject(item, type));
+    if (existing) {
+      const current = reagentQuantity(existing);
+      existing.quantity = current + amount;
+      existing.reagentType = getReagentType(existing) ?? type;
+      existing.flags = { ...(existing.flags ?? {}), reagentType: existing.reagentType };
+      existing.unitWeight = Number.isFinite(existing.unitWeight) ? existing.unitWeight : unitWeight;
+      if (existing.unitWeight <= 0) {
+        existing.unitWeight = unitWeight;
+      }
+      existing.weight = existing.unitWeight * existing.quantity;
+      if (this.party) {
+        this.party.sharedInventory = this.sharedItems;
+      }
+      return true;
+    }
+
+    let item = options.object ?? null;
+    if (item) {
+      item.quantity = amount;
+      item.unitWeight = Number.isFinite(item.unitWeight)
+        ? item.unitWeight
+        : Number.isFinite(unitWeight)
+        ? unitWeight
+        : 0.1;
+      item.weight = item.unitWeight * amount;
+    } else if (options.reagentSystem && typeof options.reagentSystem.createReagent === 'function') {
+      item = options.reagentSystem.createReagent(type, amount);
+    } else {
+      item = new Item(`reagent_${type}_${Date.now()}`, type, 0, 0, {
+        description: `A small quantity of ${type.replace(/_/g, ' ')}.`,
+        stackable: true,
+        quantity: amount,
+        weight: unitWeight * amount,
+      });
+      item.type = 'reagent';
+    }
+    if (!item) return false;
+    item.type = 'reagent';
+    item.reagentType = type;
+    item.flags = { ...(item.flags ?? {}), reagentType: type };
+    item.stackable = true;
+    item.quantity = reagentQuantity(item) || amount;
+    item.unitWeight = Number.isFinite(item.unitWeight) ? item.unitWeight : unitWeight;
+    if (!Number.isFinite(item.unitWeight) || item.unitWeight <= 0) {
+      item.unitWeight = 0.1;
+    }
+    item.weight = item.unitWeight * item.quantity;
+    if (typeof item.onUse !== 'function') {
+      item.onUse = () => ({
+        success: true,
+        message: 'You ponder how best to combine the reagent.',
+      });
+    }
+    this.sharedItems.push(item);
+    if (this.party) {
+      this.party.sharedInventory = this.sharedItems;
+    }
+    return true;
+  }
+
+  getReagentCount(type) {
+    if (!type) return 0;
+    return this.sharedItems.reduce((total, item) => {
+      if (!isReagentObject(item, type)) return total;
+      return total + reagentQuantity(item);
+    }, 0);
+  }
+
+  consumeReagent(type, quantity = 1) {
+    if (!type) return false;
+    const amount = Number.isFinite(quantity) ? Math.max(1, Math.round(quantity)) : 0;
+    if (amount <= 0) return true;
+    if (this.getReagentCount(type) < amount) {
+      return false;
+    }
+    let remaining = amount;
+    for (let index = 0; index < this.sharedItems.length && remaining > 0; index += 1) {
+      const item = this.sharedItems[index];
+      if (!isReagentObject(item, type)) continue;
+      const stackQty = reagentQuantity(item);
+      if (stackQty <= 0) continue;
+      const consume = Math.min(stackQty, remaining);
+      const unitWeight = Number.isFinite(item.unitWeight)
+        ? item.unitWeight
+        : stackQty > 0 && Number.isFinite(item.weight)
+        ? item.weight / stackQty
+        : 0.1;
+      item.unitWeight = unitWeight;
+      item.quantity = stackQty - consume;
+      item.weight = item.unitWeight * item.quantity;
+      remaining -= consume;
+      if (item.quantity <= 0) {
+        this.sharedItems.splice(index, 1);
+        index -= 1;
+      }
+    }
+    if (remaining > 0) {
+      return false;
+    }
+    if (this.party) {
+      this.party.sharedInventory = this.sharedItems;
+    }
+    return true;
+  }
+
+  listReagents() {
+    return this.sharedItems
+      .filter((item) => isReagentObject(item))
+      .map((item) => ({
+        id: item.id,
+        type: getReagentType(item),
+        name: item.name,
+        quantity: reagentQuantity(item),
+        rarity: item.rarity ?? item.flags?.rarity ?? null,
+        value: item.value ?? item.stats?.value ?? 0,
+      }));
   }
 }
 
