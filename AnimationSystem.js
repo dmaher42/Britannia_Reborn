@@ -25,6 +25,7 @@ export class AnimationSystem {
     this.activeAnimations = new Map();
     this.entityStates = new Map();
     this.setupCharacterAnimations();
+    this.setupPlayerAnimations();
   }
 
   setupCharacterAnimations() {
@@ -54,6 +55,41 @@ export class AnimationSystem {
           }
           this.animations.set(name, animation);
         });
+      });
+    });
+  }
+
+  setupPlayerAnimations() {
+    // Create animations for the player character using the player.png sprite sheet
+    // Assuming the player sprite sheet has the same layout as the character sheet
+    // but is specifically for the player/Avatar character
+    DIRECTIONS.forEach((direction, directionIndex) => {
+      ACTIONS.forEach((action, actionIndex) => {
+        const name = `player_${direction}_${action}`;
+        const frameCount = this.getFrameCount(action);
+        const animation = {
+          sheet: 'player',
+          frameWidth: this.spriteRenderer?.tileSize ?? 32,
+          frameHeight: this.spriteRenderer?.tileSize ?? 32,
+          frames: [],
+          frameTime: this.getFrameTime(action),
+          loop: action === 'idle' || action === 'walk',
+        };
+        // For now, assume a simple layout where each direction/action combination
+        // is laid out in rows and columns. This may need adjustment based on 
+        // the actual sprite sheet layout provided in image1
+        const startX = actionIndex * animation.frameWidth * frameCount;
+        const startY = directionIndex * animation.frameHeight;
+        for (let frame = 0; frame < frameCount; frame += 1) {
+          animation.frames.push({
+            sheet: 'player',
+            x: startX + frame * animation.frameWidth,
+            y: startY,
+            width: animation.frameWidth,
+            height: animation.frameHeight,
+          });
+        }
+        this.animations.set(name, animation);
       });
     });
   }
@@ -182,9 +218,16 @@ export class AnimationSystem {
   }
 
   getCharacterAnimationName(member, action = 'idle') {
-    const base = (member?.class ?? 'fighter').toLowerCase();
     const direction = (member?.facing ?? 'south').toLowerCase();
     const normalizedAction = ACTIONS.includes(action) ? action : 'idle';
+    
+    // Check if this is the player character (Avatar) and use custom player sprites
+    if (member?.name === 'Avatar') {
+      return `player_${direction}_${normalizedAction}`;
+    }
+    
+    // For other characters, use the regular class-based animations
+    const base = (member?.class ?? 'fighter').toLowerCase();
     return `${base}_${direction}_${normalizedAction}`;
   }
 }
