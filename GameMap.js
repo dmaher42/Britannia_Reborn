@@ -1,8 +1,50 @@
-const WALKABLE_TILES = new Set(['grass', 'cave_floor', 'cave_entrance', 'path']);
+import { WorldObject } from './WorldObject.js';
+
+const WALKABLE_TILES = new Set(['grass', 'cave_floor', 'cave_entrance', 'path', 'floor']);
 
 const createGrid = (rows) => rows.map((row) => row.split(' '));
 
+const parseAsciiMap = (rows, mapping) =>
+  rows.map((row) =>
+    row
+      .split('')
+      .map((symbol) => mapping[symbol] ?? mapping['.'])
+      .join(' ')
+  );
+
+const STARTER_ROOM_LAYOUT = [
+  '##########',
+  '#........#',
+  '#..A.....#',
+  '#........#',
+  '#........#',
+  'D....L..S#',
+  '#........#',
+  '#........#',
+  '#.......C#',
+  '##########',
+];
+
+const STARTER_ROOM_MAP = parseAsciiMap(STARTER_ROOM_LAYOUT, {
+  '#': 'wall',
+  '.': 'floor',
+  'D': 'floor',
+  'L': 'floor',
+  'A': 'floor',
+  'C': 'floor',
+  'S': 'floor',
+});
+
 const AREA_LIBRARY = {
+  'starter-room': {
+    id: 'starter-room',
+    name: 'Starter Chamber',
+    level: 1,
+    safe: true,
+    spawn: { x: 2, y: 5 },
+    tiles: createGrid(STARTER_ROOM_MAP),
+    transitions: [],
+  },
   forest: {
     id: 'forest',
     name: 'Whispering Forest',
@@ -70,21 +112,38 @@ const AREA_LIBRARY = {
 };
 
 const tileName = {
+  floor: 'Stone Floor',
+  wall: 'Stone Wall',
   grass: 'Grass',
   tree: 'Trees',
   water: 'Water',
   path: 'Trail',
   cave_entrance: 'Cave Entrance',
   cave_floor: 'Cavern Floor',
-  wall: 'Stone Wall',
 };
 
 export class GameMap {
   constructor(options = {}) {
     this.areas = options.areas ? { ...AREA_LIBRARY, ...options.areas } : AREA_LIBRARY;
-    this.currentAreaId = options.startArea ?? 'forest';
+    this.currentAreaId = options.startArea ?? 'starter-room';
     this.discoveredAreas = new Set([this.currentAreaId]);
-    this.currentTileType = 'grass';
+    this.currentTileType = this.tileAt(
+      this.currentArea?.spawn?.x ?? 0,
+      this.currentArea?.spawn?.y ?? 0
+    );
+    this.areaObjects = new Map();
+    const objects = options.objects ?? {};
+    Object.keys(this.areas).forEach((areaId) => {
+      const entries = objects[areaId];
+      if (Array.isArray(entries)) {
+        this.areaObjects.set(
+          areaId,
+          entries.map((entry) => (entry instanceof WorldObject ? entry : WorldObject.fromJSON(entry)))
+        );
+      } else {
+        this.areaObjects.set(areaId, []);
+      }
+    });
   }
 
   get currentArea() {
@@ -135,6 +194,10 @@ export class GameMap {
         if (!this.isWalkableTile(this.tileAt(tx, ty))) {
           return false;
         }
+        const blockers = this.objectsAt(tx, ty);
+        if (blockers.some((object) => typeof object.blocksMovement === 'function' && object.blocksMovement())) {
+          return false;
+        }
       }
     }
     return true;
@@ -145,6 +208,7 @@ export class GameMap {
     this.currentAreaId = id;
     this.discoveredAreas.add(id);
     this.currentTileType = this.tileAt(spawn?.x ?? 0, spawn?.y ?? 0);
+    this.ensureAreaObjects(id);
     return true;
   }
 
@@ -162,9 +226,14 @@ export class GameMap {
   }
 
   toJSON() {
+    const objects = {};
+    this.areaObjects.forEach((list, areaId) => {
+      objects[areaId] = list.map((object) => object.toJSON());
+    });
     return {
       currentAreaId: this.currentAreaId,
       discoveredAreas: Array.from(this.discoveredAreas),
+      objects,
     };
   }
 
@@ -176,6 +245,71 @@ export class GameMap {
     if (Array.isArray(data.discoveredAreas)) {
       this.discoveredAreas = new Set(data.discoveredAreas.filter((id) => this.areas[id]));
     }
+    this.areaObjects = new Map();
+    Object.keys(this.areas).forEach((areaId) => {
+      const entries = data.objects?.[areaId];
+      if (Array.isArray(entries)) {
+        this.areaObjects.set(areaId, entries.map((entry) => WorldObject.fromJSON(entry)));
+      } else {
+        this.areaObjects.set(areaId, []);
+      }
+    });
+  }
+
+  ensureAreaObjects(areaId) {
+    if (!this.areaObjects.has(areaId)) {
+      this.areaObjects.set(areaId, []);
+    }
+    return this.areaObjects.get(areaId);
+  }
+
+  getObjects(areaId = this.currentAreaId) {
+    return this.areaObjects.get(areaId) ?? [];
+  }
+
+  setObjects(areaId, objects = []) {
+    this.areaObjects.set(
+      areaId,
+      objects.map((object) => (object instanceof WorldObject ? object : WorldObject.fromJSON(object)))
+    );
+  }
+
+  addObject(object, areaId = this.currentAreaId) {
+    if (!(object instanceof WorldObject)) {
+      throw new TypeError('Only WorldObject instances can be added to the map.');
+    }
+    const list = this.ensureAreaObjects(areaId);
+    list.push(object);
+    return object;
+  }
+
+  removeObject(id, areaId = this.currentAreaId) {
+    const list = this.ensureAreaObjects(areaId);
+    const index = list.findIndex((object) => object.id === id);
+    if (index === -1) return null;
+    const [removed] = list.splice(index, 1);
+    return removed ?? null;
+  }
+
+  findObjectById(id, areaId = this.currentAreaId) {
+    const list = this.ensureAreaObjects(areaId);
+    return list.find((object) => object.id === id) ?? null;
+  }
+
+  objectsAt(tileX, tileY, areaId = this.currentAreaId) {
+    if (tileX < 0 || tileY < 0) return [];
+    const list = this.ensureAreaObjects(areaId);
+    return list.filter((object) => object.x === tileX && object.y === tileY);
+  }
+
+  describeTile(tileX, tileY) {
+    const base = this.tileNameAt(tileX, tileY);
+    const objects = this.objectsAt(tileX, tileY);
+    if (objects.length === 0) {
+      return `You see ${base.toLowerCase()}.`;
+    }
+    const names = objects.map((object) => object.name).join(', ');
+    return `You see ${names} on the ${base.toLowerCase()}.`;
   }
 }
 
