@@ -566,18 +566,34 @@ function restoreCombatEnemies(options = {}) {
 
 function applyAreaLighting(areaId) {
   if (!lightingSystem) return;
+  const addAreaLights = (lights) => {
+    lights.forEach(({ x, y, radius, intensity, color, options }) => {
+      lightingSystem.addLightSource(x, y, radius, intensity, color, options ?? {});
+    });
+  };
   switch (areaId) {
     case 'cave':
       lightingSystem.ambientLight = 0.18;
-      lightingSystem.addLightSource(10.5, 12.5, 2.8, 0.45, '#ff8844');
+      addAreaLights([{ x: 10.5, y: 12.5, radius: 2.8, intensity: 0.45, color: '#ff8844' }]);
       break;
-    case 'starter-room':
-      lightingSystem.ambientLight = 0.32;
-      lightingSystem.addLightSource(5.5, 5.5, 2.2, 0.4, '#ffcc88');
+    case 'starter-room': {
+      lightingSystem.ambientLight = 0.82;
+      const chandelierLights = [
+        { x: 14.5, y: 6.5, radius: 4.6, intensity: 0.55, color: '#f7d78a' },
+        { x: 14.5, y: 12.5, radius: 4.6, intensity: 0.55, color: '#f7d78a' },
+        { x: 14.5, y: 18.5, radius: 4.6, intensity: 0.55, color: '#f7d78a' },
+        { x: 14.5, y: 24.5, radius: 4.2, intensity: 0.5, color: '#fbe6a2' },
+      ];
+      const entrySconces = [
+        { x: 9.5, y: 6.5, radius: 3.1, intensity: 0.4, color: '#ffd59e' },
+        { x: 19.5, y: 6.5, radius: 3.1, intensity: 0.4, color: '#ffd59e' },
+      ];
+      addAreaLights([...chandelierLights, ...entrySconces]);
       break;
+    }
     default:
-      lightingSystem.ambientLight = 0.48;
-      lightingSystem.addLightSource(12.5, 8.5, 3.2, 0.3, '#a0c4ff');
+      lightingSystem.ambientLight = 0.65;
+      addAreaLights([{ x: 12.5, y: 8.5, radius: 3.6, intensity: 0.32, color: '#a0c4ff' }]);
       break;
   }
 }
