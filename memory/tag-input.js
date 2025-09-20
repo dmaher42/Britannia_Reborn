@@ -1,6 +1,6 @@
 import { formatTag, normalizeTag } from './tag-manager.js';
 
-export function createTagInput(container, { manager, placeholder = 'Add tag', initialTags = [], onChange } = {}) {
+export function createTagInput(container, { manager, placeholder = 'Add tag', initialTags = [], onChange, inputId } = {}) {
   if (!container) {
     throw new Error('Tag input requires a container element.');
   }
@@ -14,6 +14,9 @@ export function createTagInput(container, { manager, placeholder = 'Add tag', in
   input.type = 'text';
   input.placeholder = placeholder;
   input.setAttribute('aria-label', placeholder);
+  if (inputId) {
+    input.id = inputId;
+  }
   root.appendChild(input);
 
   const suggestionsEl = document.createElement('div');

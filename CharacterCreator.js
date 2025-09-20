@@ -14,9 +14,9 @@ const template = () => `
         <h2 id="creatorTitle">Forge Your Avatar</h2>
         <p>Create a hero to lead Britannia's rebirth. Allocate core attributes or embrace fate.</p>
       </header>
-      <label class="field">
+      <label class="field" for="characterName">
         <span>Name</span>
-        <input name="name" type="text" maxlength="24" placeholder="Avatar" required />
+        <input id="characterName" name="name" type="text" maxlength="24" placeholder="Avatar" required />
       </label>
       <div class="stats">
         ${CharacterStats.KEYS.map(
