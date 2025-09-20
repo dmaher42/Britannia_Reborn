@@ -104,39 +104,40 @@ const worldAdapter = {
   canMoveTo: (x, y, radius = 0.3) => map.isWalkableCircle(x, y, radius),
 };
 
-function createStarterObjects() {
-  const door = new Door('door1', 'wooden door', 0, 5, {
-    description: 'A stout wooden door bound with iron.',
+function createCastleObjects() {
+  const throneGate = new Door('throne_gate', 'ornate portcullis', 14, 7, {
+    description: 'Polished bronze bars guard the entrance to the Great Hall.',
+    isOpen: true,
   });
-  const secretDoor = new Door('secretDoor', 'secret stone door', 8, 5, {
-    description: 'A section of wall looks slightly loose.',
+  const secretDoor = new Door('secretDoor', 'hidden barracks door', 8, 10, {
+    description: 'A section of stonework bears faint hinges.',
     isOpen: false,
   });
-  const lever = new Lever('lever1', 'stone lever', 5, 5, {
+  const lever = new Lever('lever1', 'concealed lever', 12, 10, {
     toggles: 'secretDoor',
-    description: 'A lever jutting from a metal plate bolted to the floor.',
+    description: 'A wrought-iron lever tucked behind a hanging banner.',
   });
-  const apple = new Item('apple1', 'red apple', 3, 2, {
-    description: 'A crisp apple with a shine to its peel.',
+  const apple = new Item('apple1', 'red apple', 14, 18, {
+    description: 'A crisp apple arranged on a silver platter.',
     weight: 0.1,
     food: true,
   });
-  const chest = new Container('chest1', 'wooden chest', 8, 8, {
-    description: 'An old chest with an iron lock long since broken.',
+  const chest = new Container('chest1', 'guardroom chest', 3, 9, {
+    description: 'A brass-bound chest used by the castle guard.',
     contains: [
-      new Item('sword1', 'iron sword', 8, 8, {
+      new Item('sword1', 'iron sword', 3, 9, {
         description: 'A sturdy iron blade, serviceable if not ornate.',
         weight: 3,
         stats: { attack: 5, attackSpeed: 900, str_req: 10 },
         flags: { slot: 'weapon' },
       }),
-      new Item('gold_pouch', 'pouch of gold', 8, 8, {
+      new Item('gold_pouch', 'pouch of gold', 3, 9, {
         description: 'A leather pouch jingling with a few coins.',
         weight: 0.4,
       }),
     ],
   });
-  return [door, secretDoor, lever, apple, chest];
+  return [throneGate, secretDoor, lever, apple, chest];
 }
 
 function createTownObjects() {
@@ -167,7 +168,7 @@ function syncTownNPCs() {
   smithyNPC = map.findObjectById('npc_smithy', 'forest') ?? smithyNPC;
 }
 
-map.setObjects('starter-room', createStarterObjects());
+map.setObjects('starter-room', createCastleObjects());
 map.setObjects('forest', createTownObjects());
 syncTownNPCs();
 
@@ -297,14 +298,14 @@ const leaderProxy = { position: { x: party.leader?.x ?? 0, y: party.leader?.y ??
 const combatTriggers = [
   {
     area: 'starter-room',
-    bounds: { x: 4, y: 3, width: 4, height: 3 },
+    bounds: { x: 11, y: 15, width: 8, height: 6 },
     triggered: false,
-    message: 'Rats scurry from the shadows!',
+    message: 'Footpads dart from behind the great tapestries!',
     enemies: [
-      { type: 'rat', x: 6.5, y: 3.5 },
-      { type: 'rat', x: 7.2, y: 4.5 },
-      { type: 'rat', x: 5.8, y: 4.0 },
-      { type: 'bat', x: 6.5, y: 2.5 },
+      { type: 'rat', x: 12.5, y: 16.2 },
+      { type: 'rat', x: 16.8, y: 17.1 },
+      { type: 'rat', x: 14.2, y: 18.3 },
+      { type: 'bat', x: 15.6, y: 15.4 },
     ],
   },
 ];
