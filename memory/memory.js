@@ -192,6 +192,7 @@ function setupForms() {
       manager: tagManager,
       placeholder: 'Type a tag and press enter',
       onChange: () => updatePreferencesSnapshot(),
+      inputId: `${section}TagInputField`,
     });
     tagInputs[section] = tagInput;
 
@@ -303,7 +304,9 @@ function renderFilterControls(section) {
   counts.forEach(({ tag, count }) => {
     const label = document.createElement('label');
     const checkbox = document.createElement('input');
+    const checkboxId = `${section}Filter${tag.replace(/[^a-zA-Z0-9]/g, '')}`;
     checkbox.type = 'checkbox';
+    checkbox.id = checkboxId;
     checkbox.value = tag;
     checkbox.checked = filtersState[section].includes(tag);
     checkbox.addEventListener('change', () => {
@@ -313,6 +316,7 @@ function renderFilterControls(section) {
         removeFilterTag(section, tag);
       }
     });
+    label.setAttribute('for', checkboxId);
     label.appendChild(checkbox);
     const span = document.createElement('span');
     span.textContent = formatTag(tag);

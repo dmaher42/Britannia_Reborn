@@ -58,18 +58,18 @@
         </div>
         <form id="reminderForm" class="item-form" autocomplete="off">
           <div class="form-grid">
-            <label>
+            <label for="reminderTitle">
               <span>Title</span>
-              <input type="text" name="title" required placeholder="e.g., Email parents about field trip" />
+              <input type="text" id="reminderTitle" name="title" required placeholder="e.g., Email parents about field trip" />
             </label>
-            <label>
+            <label for="reminderDueDate">
               <span>Due date</span>
-              <input type="date" name="dueDate" />
+              <input type="date" id="reminderDueDate" name="dueDate" />
             </label>
           </div>
-          <label class="full-width">
+          <label for="reminderDetails" class="full-width">
             <span>Details</span>
-            <textarea name="details" rows="2" placeholder="Add context or action steps"></textarea>
+            <textarea id="reminderDetails" name="details" rows="2" placeholder="Add context or action steps"></textarea>
           </label>
           <div class="full-width">
             <span class="label">Tags</span>
@@ -93,18 +93,18 @@
         </div>
         <form id="lessonForm" class="item-form" autocomplete="off">
           <div class="form-grid">
-            <label>
+            <label for="lessonTitle">
               <span>Lesson title</span>
-              <input type="text" name="title" required placeholder="e.g., Fractions lab" />
+              <input type="text" id="lessonTitle" name="title" required placeholder="e.g., Fractions lab" />
             </label>
-            <label>
+            <label for="lessonGrade">
               <span>Grade level</span>
-              <input type="text" name="grade" placeholder="e.g., Grade 3" />
+              <input type="text" id="lessonGrade" name="grade" placeholder="e.g., Grade 3" />
             </label>
           </div>
-          <label class="full-width">
+          <label for="lessonOverview" class="full-width">
             <span>Overview</span>
-            <textarea name="overview" rows="2" placeholder="Key objectives or materials"></textarea>
+            <textarea id="lessonOverview" name="overview" rows="2" placeholder="Key objectives or materials"></textarea>
           </label>
           <div class="full-width">
             <span class="label">Tags</span>
@@ -127,13 +127,13 @@
           <div class="filter-region" id="notesFilterRegion"></div>
         </div>
         <form id="noteForm" class="item-form" autocomplete="off">
-          <label class="full-width">
+          <label for="noteTitle" class="full-width">
             <span>Title</span>
-            <input type="text" name="title" required placeholder="e.g., Parent meeting recap" />
+            <input type="text" id="noteTitle" name="title" required placeholder="e.g., Parent meeting recap" />
           </label>
-          <label class="full-width">
+          <label for="noteContent" class="full-width">
             <span>Note</span>
-            <textarea name="content" rows="3" placeholder="Details you want to remember"></textarea>
+            <textarea id="noteContent" name="content" rows="3" placeholder="Details you want to remember"></textarea>
           </label>
           <div class="full-width">
             <span class="label">Tags</span>

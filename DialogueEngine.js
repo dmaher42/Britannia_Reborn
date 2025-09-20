@@ -180,6 +180,7 @@ export class DialogueEngine {
 
     const inputRow = createElement('div', 'conversation-input');
     this.inputField = document.createElement('input');
+    this.inputField.id = 'conversationInput';
     this.inputField.type = 'text';
     this.inputField.placeholder = 'Type a keyword (name, job, magic...)';
     this.inputField.autocomplete = 'off';
