@@ -401,13 +401,29 @@ export class WorldRenderer {
     if (monsterIndex === -1) {
       return null;
     }
-    const key = `${base}_${direction}_${action}`;
+    
+    // Check if we should use a specific sprite sheet for this monster
+    const monsterType = base.toLowerCase();
+    let spriteSheet = 'monsters';
+    let key = `${base}_${direction}_${action}`;
+    
+    if (['rat', 'bat', 'skeleton', 'slime'].includes(monsterType)) {
+      // Try to load monster-specific sprite sheet
+      this.spriteRenderer?.loadSpecificSpriteSheet(monsterType);
+      const preferredSheet = this.spriteRenderer?.getPreferredSpriteSheet(enemy);
+      if (preferredSheet === monsterType) {
+        // Use monster-specific animation naming and sprite sheet
+        spriteSheet = monsterType;
+        key = `${monsterType}_${direction}_${action}`;
+      }
+    }
+    
     if (!this.animationSystem?.animations?.has(key)) {
       const frameHeight = this.spriteRenderer.tileSize;
       const rowIndex = monsterIndex * MONSTER_ACTIONS.length + (actionIndex === -1 ? 0 : actionIndex);
       const startY = rowIndex * frameHeight;
       this.animationSystem?.registerAnimation(key, {
-        sheet: 'monsters',
+        sheet: spriteSheet,
         startX: 0,
         startY,
         frames: 4,
@@ -423,7 +439,29 @@ export class WorldRenderer {
     const className = NPC_CLASS_BY_PROFESSION[profession] ?? 'bard';
     const direction = (npc?.facing ?? 'south').toLowerCase();
     const action = npc?.isMoving ? 'walk' : 'idle';
-    return `${className}_${direction}_${action}`;
+    
+    // Check if we should use a specific sprite sheet for this NPC
+    const npcName = (npc?.name || '').toLowerCase();
+    let prefix = className;
+    
+    // Use specific sprite sheet names for key NPCs if available
+    if (npcName === 'iolo') {
+      // Try to load Iolo's specific sprite sheet
+      this.spriteRenderer?.loadSpecificSpriteSheet('iolo');
+      const preferredSheet = this.spriteRenderer?.getPreferredSpriteSheet(npc);
+      if (preferredSheet === 'iolo') {
+        prefix = 'iolo';
+      }
+    } else if (npcName === 'shamino') {
+      // Try to load Shamino's specific sprite sheet
+      this.spriteRenderer?.loadSpecificSpriteSheet('shamino');
+      const preferredSheet = this.spriteRenderer?.getPreferredSpriteSheet(npc);
+      if (preferredSheet === 'shamino') {
+        prefix = 'shamino';
+      }
+    }
+    
+    return `${prefix}_${direction}_${action}`;
   }
 
   drawFallbackCircle(x, y, color) {

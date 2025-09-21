@@ -1,6 +1,16 @@
 import { PlaceholderGraphics } from './PlaceholderGraphics.js';
 
-const SPRITE_SHEETS = ['characters', 'monsters', 'items', 'tiles', 'effects', 'ui', 'player'];
+// Core sprite sheets that are always loaded
+const CORE_SPRITE_SHEETS = ['characters', 'monsters', 'items', 'tiles', 'effects', 'ui', 'player'];
+
+// Specific NPC sprite sheets - loaded on demand or as fallbacks
+const NPC_SPRITE_SHEETS = ['iolo', 'shamino', 'avatar'];
+
+// Monster-specific sprite sheets - loaded on demand for specific monster types
+const MONSTER_SPRITE_SHEETS = ['rat', 'bat', 'skeleton', 'slime', 'orc', 'troll', 'dragon'];
+
+// All sprite sheets that may be loaded
+const ALL_SPRITE_SHEETS = [...CORE_SPRITE_SHEETS, ...NPC_SPRITE_SHEETS, ...MONSTER_SPRITE_SHEETS];
 
 export class SpriteRenderer {
   constructor(canvas, context, options = {}) {
@@ -25,7 +35,59 @@ export class SpriteRenderer {
   }
 
   loadSpriteSheets() {
-    SPRITE_SHEETS.forEach((sheetName) => this.loadSpriteSheet(sheetName));
+    // Load core sprite sheets first
+    CORE_SPRITE_SHEETS.forEach((sheetName) => this.loadSpriteSheet(sheetName));
+  }
+
+  /**
+   * Load specific sprite sheets on demand (e.g., for specific NPCs or monsters)
+   * @param {string} sheetName - Name of the sprite sheet to load
+   * @returns {Promise<boolean>} - Whether the sheet was loaded successfully
+   */
+  loadSpecificSpriteSheet(sheetName) {
+    if (this.spriteSheets.has(sheetName)) {
+      return Promise.resolve(this.spriteSheets.get(sheetName).loaded);
+    }
+    
+    if (!ALL_SPRITE_SHEETS.includes(sheetName)) {
+      console.warn(`Unknown sprite sheet requested: ${sheetName}`);
+      return Promise.resolve(false);
+    }
+    
+    this.loadSpriteSheet(sheetName);
+    return this.whenSheetReady(sheetName);
+  }
+
+  /**
+   * Wait for a specific sprite sheet to be loaded
+   * @param {string} sheetName - Name of the sprite sheet
+   * @returns {Promise<boolean>} - Whether the sheet loaded successfully
+   */
+  whenSheetReady(sheetName) {
+    const record = this.spriteSheets.get(sheetName);
+    if (!record) {
+      return Promise.resolve(false);
+    }
+    if (record.loaded) {
+      return Promise.resolve(true);
+    }
+    
+    // Wait for the loading promise to complete
+    return new Promise((resolve) => {
+      const checkInterval = setInterval(() => {
+        const currentRecord = this.spriteSheets.get(sheetName);
+        if (currentRecord && currentRecord.loaded) {
+          clearInterval(checkInterval);
+          resolve(true);
+        }
+      }, 50);
+      
+      // Timeout after 5 seconds
+      setTimeout(() => {
+        clearInterval(checkInterval);
+        resolve(false);
+      }, 5000);
+    });
   }
 
   loadSpriteSheet(name) {
@@ -84,7 +146,8 @@ export class SpriteRenderer {
   }
 
   updateReadyState() {
-    this.ready = SPRITE_SHEETS.every((sheetName) => this.spriteSheets.get(sheetName)?.loaded);
+    // Only consider core sprite sheets for ready state
+    this.ready = CORE_SPRITE_SHEETS.every((sheetName) => this.spriteSheets.get(sheetName)?.loaded);
   }
 
   setScale(scale) {
@@ -161,12 +224,26 @@ export class SpriteRenderer {
   drawPlaceholderRect(destX, destY, sheetName, destWidth, destHeight) {
     if (!this.ctx) return;
     const colors = {
+      // Core sprite sheets
       characters: '#4169E1',
       monsters: '#DC143C',
       items: '#FFD700',
       tiles: '#228B22',
       effects: '#FF1493',
       ui: '#708090',
+      player: '#9370DB',
+      // NPC-specific sprite sheets
+      iolo: '#32CD32',      // Lime green for Iolo the Bard
+      shamino: '#8B4513',   // Saddle brown for Shamino the Ranger
+      avatar: '#FFD700',    // Gold for the Avatar
+      // Monster-specific sprite sheets
+      rat: '#8B4513',       // Brown for rats
+      bat: '#2F4F4F',       // Dark slate gray for bats
+      skeleton: '#F5F5DC',  // Beige for skeletons
+      slime: '#32CD32',     // Lime green for slimes
+      orc: '#556B2F',       // Dark olive green for orcs
+      troll: '#696969',     // Dim gray for trolls
+      dragon: '#B22222',    // Fire brick for dragons
     };
 
     this.ctx.save();
@@ -178,16 +255,80 @@ export class SpriteRenderer {
     this.ctx.restore();
   }
 
+  /**
+   * Get the preferred sprite sheet for a character or NPC
+   * Falls back to generic sheets if specific ones aren't available
+   * @param {Object} character - Character or NPC object
+   * @returns {string} - Sprite sheet name to use
+   */
+  getPreferredSpriteSheet(character) {
+    if (!character) return 'characters';
+    
+    const name = (character.name || '').toLowerCase();
+    const type = (character.type || '').toLowerCase();
+    
+    // Check for specific NPC sprite sheets
+    if (name === 'iolo' && this.spriteSheets.has('iolo') && this.spriteSheets.get('iolo').loaded) {
+      return 'iolo';
+    }
+    if (name === 'shamino' && this.spriteSheets.has('shamino') && this.spriteSheets.get('shamino').loaded) {
+      return 'shamino';
+    }
+    if (name === 'avatar' && this.spriteSheets.has('avatar') && this.spriteSheets.get('avatar').loaded) {
+      return 'avatar';
+    }
+    
+    // Check for monster-specific sprite sheets
+    if (type === 'enemy' || type === 'monster') {
+      const monsterType = character.monsterType || character.enemyType || name;
+      if (MONSTER_SPRITE_SHEETS.includes(monsterType) && 
+          this.spriteSheets.has(monsterType) && 
+          this.spriteSheets.get(monsterType).loaded) {
+        return monsterType;
+      }
+      return 'monsters'; // Fallback to generic monsters sheet
+    }
+    
+    // For party members, check if they have specific sheets
+    if (character.isPlayer || name === 'avatar') {
+      return this.spriteSheets.has('avatar') && this.spriteSheets.get('avatar').loaded ? 'avatar' : 'player';
+    }
+    
+    // Default fallback
+    return 'characters';
+  }
+
   testPlaceholders() {
-    const testSheets = ['characters', 'monsters', 'items', 'tiles', 'effects', 'ui'];
+    const testSheets = [...CORE_SPRITE_SHEETS];
     console.log('Testing placeholder graphics...');
     testSheets.forEach((sheet) => {
       if (this.spriteSheets.has(sheet)) {
-        console.log(`✅ ${sheet}: Ready`);
+        const record = this.spriteSheets.get(sheet);
+        if (record.loaded) {
+          const status = record.isPlaceholder ? '🟡 Placeholder' : '✅ Loaded';
+          console.log(`${status}: ${sheet}`);
+        } else {
+          console.log(`❌ ${sheet}: Missing`);
+        }
       } else {
-        console.log(`❌ ${sheet}: Missing`);
+        console.log(`❌ ${sheet}: Not initialized`);
       }
     });
+    
+    // Also report on any loaded specific sprite sheets
+    const loadedSpecific = [];
+    [...NPC_SPRITE_SHEETS, ...MONSTER_SPRITE_SHEETS].forEach((sheet) => {
+      if (this.spriteSheets.has(sheet) && this.spriteSheets.get(sheet).loaded) {
+        const record = this.spriteSheets.get(sheet);
+        const status = record.isPlaceholder ? '🟡 Placeholder' : '✅ Loaded';
+        loadedSpecific.push(`${status}: ${sheet}`);
+      }
+    });
+    
+    if (loadedSpecific.length > 0) {
+      console.log('Specific sprite sheets loaded:');
+      loadedSpecific.forEach(msg => console.log(msg));
+    }
   }
 
   drawAnimatedSprite(animation, frameIndex, destX, destY, options = {}) {
