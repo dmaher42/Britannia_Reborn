@@ -57,6 +57,53 @@ export class AnimationSystem {
         });
       });
     });
+    
+    // Setup specific NPC animations (using the same layout but different sprite sheets)
+    this.setupSpecificNPCAnimations();
+  }
+
+  /**
+   * Setup animations for specific NPCs like Iolo and Shamino
+   * These use the same animation structure but reference their own sprite sheets
+   */
+  setupSpecificNPCAnimations() {
+    const specificNPCs = [
+      { name: 'iolo', sheet: 'iolo', classType: 'bard' },
+      { name: 'shamino', sheet: 'shamino', classType: 'ranger' },
+      { name: 'avatar', sheet: 'avatar', classType: 'fighter' },
+    ];
+    
+    specificNPCs.forEach(({ name, sheet, classType }) => {
+      const classIndex = CHARACTER_CLASSES.indexOf(classType);
+      if (classIndex === -1) return;
+      
+      DIRECTIONS.forEach((direction, directionIndex) => {
+        ACTIONS.forEach((action, actionIndex) => {
+          const animationName = `${name}_${direction}_${action}`;
+          const frameCount = this.getFrameCount(action);
+          const animation = {
+            sheet: sheet,
+            frameWidth: this.spriteRenderer?.tileSize ?? 32,
+            frameHeight: this.spriteRenderer?.tileSize ?? 32,
+            frames: [],
+            frameTime: this.getFrameTime(action),
+            loop: action === 'idle' || action === 'walk',
+          };
+          const startX = this.getAnimationStartX(classIndex, directionIndex, actionIndex);
+          const startY = this.getAnimationStartY(classIndex, directionIndex, actionIndex);
+          for (let frame = 0; frame < frameCount; frame += 1) {
+            animation.frames.push({
+              sheet: sheet,
+              x: startX + frame * animation.frameWidth,
+              y: startY,
+              width: animation.frameWidth,
+              height: animation.frameHeight,
+            });
+          }
+          this.animations.set(animationName, animation);
+        });
+      });
+    });
   }
 
   setupPlayerAnimations() {
